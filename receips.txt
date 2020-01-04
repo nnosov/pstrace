@@ -1,0 +1,2 @@
+#produce very simple debug info vithout sources
+echo 'void foo () {}' | gcc -g -O99 -o - -S -xc - -dA | grep frame_base
