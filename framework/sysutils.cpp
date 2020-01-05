@@ -23,7 +23,8 @@ extern SC_LogBase* logger;
 char __stack_trace[8192];
 
 
-Dwarf_Frame* frame;
+Dwarf_Frame* frame = 0;
+Dwarf_Frame* prev_frame = 0;
 Dwfl_Module* module;
 
 // dwfl_addrsegment() possibly can be used to check address validity
@@ -163,18 +164,44 @@ void HandleType(Dwarf_Attribute* param, bool is_return = false)
 	}
 }
 
-void
-print_expr_block (Dwarf_Attribute *attr, Dwarf_Op *exprs, int len,
-		  Dwarf_Addr addr, int depth)
+void print_framereg(int regno)
 {
-  printf ("{");
-  for (int i = 0; i < len; i++)
-    {
-      printf ("%s", (i + 1 < len ? ", " : ""));
-    }
-  printf ("}");
+	Dwarf_Op ops_mem[3];
+	Dwarf_Op* ops;
+	size_t nops;
+	int ret = dwarf_frame_register(frame, regno, ops_mem, &ops, &nops);
+	if(ret != 0) {
+		logger->Log(SEVERITY_DEBUG, "Failed to get CFI expression for register 0x%hhX", regno);
+		return;
+	}
+	if(nops == 0 && ops == ops_mem) {
+		logger->Log(SEVERITY_DEBUG, "CFI expression for register 0x%hhX is UNDEFINED", regno);
+		return;
+	}
+	if(nops == 0 && ops == NULL) {
+		logger->Log(SEVERITY_DEBUG, "CFI expression for register 0x%hhX is SAME VALUE", regno);
+		return;
+	}
+	logger->Log(SEVERITY_DEBUG, "Found CFI expression for register 0x%hhX, number of expressions: %d", regno, nops);
+	for(size_t i = 0; i < nops; ++i) {
+		logger->Log(SEVERITY_DEBUG, "\t[%d] operation: 0x%hhX, operand1: 0x%lX, operand2: 0x%lx, offset: 0x%lX", i, ops[i].atom, ops[i].number, ops[i].number2, ops[i].offset);
+	}
 }
 
+
+void
+print_expr_block (Dwarf_Op *exprs, int len, char* buff, uint32_t buff_size)
+{
+	uint32_t offset = 0;
+	for (int i = 0; i < len; i++) {
+		//printf ("%s", (i + 1 < len ? ", " : ""));
+		offset += snprintf(buff + offset, buff_size - offset, "0x%hhX(0x%lX, 0x%lx) ", exprs[i].atom, exprs[i].number, exprs[i].number2);
+		if(exprs[i].atom >= DW_OP_reg0 && exprs[i].atom <= DW_OP_bregx) {
+			print_framereg(exprs[i].atom);
+		}
+	}
+
+}
 void HandleParameter(Dwarf_Die* result)
 {
 	Dwarf_Attribute attr_mem;
@@ -190,56 +217,35 @@ void HandleParameter(Dwarf_Die* result)
 	// determine location of parameter in stack/heap or CPU registers
 	attr = dwarf_attr(result, DW_AT_location, &attr_mem);
 	if(attr) {
-		logger->Log(SEVERITY_DEBUG, "parameter location attribute form = 0x%X, code = 0x%X", attr->form, attr->code);
 		if(dwarf_hasform(attr, DW_FORM_exprloc)) {
 			Dwarf_Op *expr;
 			size_t exprlen;
 			if (dwarf_getlocation(attr, &expr, &exprlen) == 0) {
-				logger->Log(SEVERITY_DEBUG, "Found DW_AT_location expression");
-				print_detail(0, expr, exprlen, 0, "\tLocation ");
+				char str[1024]; str[0] = 0;
+				print_expr_block (expr, exprlen, str, sizeof(str));
+				logger->Log(SEVERITY_DEBUG, "Found DW_AT_location expression: %s", str);
 				if(expr[0].atom >= DW_OP_reg0 && expr[0].atom <= DW_OP_bregx) {
-					Dwarf_Op ops_mem[3];
-					Dwarf_Op* ops;
-					size_t nops;
-					int ret = dwarf_frame_register(frame, expr[0].atom, ops_mem, &ops, &nops);
-					if(ret != 0) {
-						logger->Log(SEVERITY_DEBUG, "Failed to get CFI expression for register 0x%hhX", expr[0].atom);
-						return;
-					}
-					if(nops == 0 && ops == ops_mem) {
-						logger->Log(SEVERITY_DEBUG, "CFI expression for register 0x%hhX is UNDEFINED", expr[0].atom);
-						return;
-					}
-					if(nops == 0 && ops == NULL) {
-						logger->Log(SEVERITY_DEBUG, "CFI expression for register 0x%hhX is SAME VALUE", expr[0].atom);
-						return;
-					}
-					logger->Log(SEVERITY_DEBUG, "Found CFI expression for register 0x%hhX, number of expressions: %d", expr[0].atom, nops);
-					for(size_t i = 0; i < nops; ++i) {
-						logger->Log(SEVERITY_DEBUG, "\t[%d] operation: 0x%hhX, operand1: 0x%lX, operand2: 0x%lx, offset: 0x%lX", i, ops[i].atom, ops[i].number, ops[i].number2, ops[i].offset);
-					}
+					print_framereg(expr[0].atom);
 				}
 			}
 		} else if(dwarf_hasform(attr, DW_FORM_sec_offset)) {
 			Dwarf_Addr base, start, end;
 			ptrdiff_t off = 0;
-			Dwarf_Op *fb_expr;
-			size_t fb_exprlen;
-			while ((off = dwarf_getlocations (attr, off, &base, &start, &end, &fb_expr, &fb_exprlen)) > 0) {
-				printf ("      (%" PRIx64 ",%" PRIx64 ") ", start, end);
-				print_expr_block (attr, fb_expr, fb_exprlen, start, 0);
-				printf ("\n");
-			}
-
-
+			Dwarf_Op *expr;
+			size_t exprlen;
 			Dwarf_Word value;
-
 			int ret = dwarf_formudata(attr, &value);
-			if(ret >= 0) {
-				logger->Log(SEVERITY_DEBUG, "Found DW_AT_location offset = 0x%lX", value);
+			if(ret < 0) {
+				logger->Log(SEVERITY_ERROR, "Cannot get DW_AT_location offset");
 			}
+			for(int i = 0; (off = dwarf_getlocations (attr, off, &base, &start, &end, &expr, &exprlen)) > 0; ++i) {
+				char str[1024]; str[0] = 0;
+				print_expr_block (expr, exprlen, str, sizeof(str));
+				logger->Log(SEVERITY_DEBUG, "[%d] low_offset: %" PRIx64 ", high_offset: %" PRIx64 ", .debug_locations section offset: 0x%lX ==> %s", i, start, end, value, str);
+			}
+
 		} else {
-			logger->Log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X", attr->form, attr->code);
+			logger->Log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X, ", attr->form, attr->code);
 		}
 
 	}
@@ -260,8 +266,10 @@ void HandleFunction(Dwarf_Die* func, const char* fname)
 				Dwarf_Op *expr;
 				size_t exprlen;
 				if (dwarf_getlocation (attr, &expr, &exprlen) == 0) {
-					logger->Log(SEVERITY_DEBUG, "Found DW_AT_framebase expression");
-					print_detail(0, expr, exprlen, 0, "\tLocation ");
+					char str[1024]; str[0] = 0;
+					print_expr_block (expr, exprlen, str, sizeof(str));
+					logger->Log(SEVERITY_DEBUG, "Found DW_AT_framebase expression: %s", str);
+					//print_detail(0, expr, exprlen, 0, "\tLocation ");
 				} else {
 					logger->Log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X", attr->form, attr->code);
 				}
@@ -329,10 +337,10 @@ static void print_detail (int result, const Dwarf_Op *ops, size_t nops, Dwarf_Ad
 
 void HandleCompilationUnit(Dwfl_Module* module, Dwarf_Addr addr, const char* fname)
 {
-    Dwarf_Addr mod_bias = 0;
-    // get function debug definition
-    Dwarf_Die* cdie = dwfl_module_addrdie(module, addr, &mod_bias);
-    logger->Log(SEVERITY_DEBUG, "Function bias in module is 0x%lX", mod_bias);
+    Dwarf_Addr mod_cu = 0;
+    // get CU(Compilation Unit) debug definition
+    Dwarf_Die* cdie = dwfl_module_addrdie(module, addr, &mod_cu);
+    logger->Log(SEVERITY_DEBUG, "Function bias in module is 0x%lX", mod_cu);
     //Dwarf_Die* cdie = dwfl_addrdie(dwfl, addr, &mod_bias);
     if(!cdie) {
     	logger->Log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", addr);
@@ -341,10 +349,15 @@ void HandleCompilationUnit(Dwfl_Module* module, Dwarf_Addr addr, const char* fna
 
     // get CFI (Call Frame Information) for current module
     // from handle_cfi()
+    Dwarf_Addr mod_bias = 0;
     Dwarf_CFI* cfi = dwfl_module_eh_cfi(module, &mod_bias);
+    //Dwarf_CFI* cfi = dwfl_module_dwarf_cfi(module, &mod_bias);
     if(cfi) {
     	// get frame of CFI for address
     	logger->Log(SEVERITY_INFO, "Found CFI for module %s", dwarf_diename(cdie));
+    	if(frame) {
+    		prev_frame = frame;
+    	}
     	int result = dwarf_cfi_addrframe (cfi, addr - mod_bias, &frame);
     	if (result == 0) {
     		// get frame information
@@ -353,8 +366,7 @@ void HandleCompilationUnit(Dwfl_Module* module, Dwarf_Addr addr, const char* fna
         	Dwarf_Addr end = addr;
         	bool signalp;
         	int ra_regno = dwarf_frame_info (frame, &start, &end, &signalp);
-        	if (ra_regno >= 0)
-        	{
+        	if(ra_regno >= 0) {
         		start += mod_bias;
         		end += mod_bias;
         	}
@@ -374,8 +386,10 @@ void HandleCompilationUnit(Dwfl_Module* module, Dwarf_Addr addr, const char* fna
         	  Dwarf_Op *cfa_ops = &dummy;
         	  size_t cfa_nops;
         	  result = dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops);
-
-        	  print_detail (result, cfa_ops, cfa_nops, mod_bias, "\tCFA ");
+        	  char str[1024]; str[0] = 0;
+        	  print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
+        	  logger->Log(SEVERITY_INFO, "Found CFA expression: %s", str);
+        	  //print_detail (result, cfa_ops, cfa_nops, mod_bias, "\tCFA ");
     	}
 
     }
