@@ -63,14 +63,15 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     fatal_error_in_progress = 1;
 
     logger->Log(SEVERITY_ERROR, "%s signal handled", strsignal(sig));
-    const char* trace = 0;
+    bool trace = false;
+    pst_context ctx((ucontext_t*)context);
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    trace = LibdwTraceCallStack((ucontext_t*)context);
+	    trace = ctx.unwind();
     }
 
 	if(trace) {
-	    logger->Log(SEVERITY_DEBUG, "%s", trace);
+	    logger->Log(SEVERITY_DEBUG, "%s", ctx.buff);
 	} else {
 	    logger->Log(SEVERITY_ERROR, "No stack trace obtained");
 	}
@@ -193,7 +194,7 @@ int main(int argc, char* argv[])
 
     SetSignalHandler(SigusrHandler);
 
-    Fun1(1, DEF_2, 3);
+    Fun1(1, DEF_2, 5);
 
     return 0;
 }

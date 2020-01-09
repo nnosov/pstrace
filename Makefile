@@ -49,7 +49,7 @@ SRC 		= $(shell find . -name '*.cpp')
 #OBJ 		= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 OBJ 		= $(BUILD_DIR)/main.o
 
-LIBS 		= -L./ -lpthread -lpq -lpqtypes -luuid -lrabbitmq -ljson-c -lcrypto -ldl -lcurl -ldw -lxml2 -lmicrohttpd -larchive -lmagic
+LIBS 		= -L./ -lpthread -lpq -lpqtypes -luuid -lrabbitmq -ljson-c -lcrypto -ldl -lcurl -ldw -lxml2 -lmicrohttpd -larchive -lmagic -lunwind -lunwind-x86_64
 ATR_LIBS	= ./build/libframework.a
 
 INCS		= -I./ \
