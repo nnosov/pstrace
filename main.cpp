@@ -64,14 +64,14 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 
     logger->Log(SEVERITY_ERROR, "%s signal handled", strsignal(sig));
     bool trace = false;
-    pst_context ctx((ucontext_t*)context);
+    pst_handler handler((ucontext_t*)context);
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    trace = ctx.unwind();
+	    trace = handler.unwind();
     }
 
 	if(trace) {
-	    logger->Log(SEVERITY_DEBUG, "%s", ctx.buff);
+	    logger->Log(SEVERITY_DEBUG, "%s", handler.ctx.buff);
 	} else {
 	    logger->Log(SEVERITY_ERROR, "No stack trace obtained");
 	}

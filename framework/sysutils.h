@@ -21,18 +21,21 @@
 #include <elfutils/libdwfl.h>
 #include <dlfcn.h>
 
+#include "common.h"
+
 char* GetExecutableName(char* path, uint32_t size);
 
 typedef struct __pst_function pst_function;
 
 typedef struct __pst_parameter {
-	__pst_parameter(pst_function* fun) : function(fun)
+	__pst_parameter(pst_context* c) : ctx(c)
 	{
 		die = NULL;
 		size = 0;
 		type = 0;
 		loc = NULL;
 		is_return = false;
+		value = 0;
 	}
 
 	bool handle_dwarf(Dwarf_Die* d);
@@ -42,13 +45,14 @@ typedef struct __pst_parameter {
 	std::string					name;	// parameter's name
 	Dwarf_Word					size;	// size of parameter in bytes
 	int							type;	// base type of parameter in DW_TAG_XXX types enumeration
-	std::vector<std::string>	types;	// list of parameters definitions i.e. 'typedef', 'uint32_t'
+	std::vector<std::string>	types;	// list of parameter's definitions i.e. 'typedef', 'uint32_t'
 	void*						loc;	// pointer to location of parameter's value
 	bool						is_return; // whether this parameter is return value of the function
-	pst_function*				function;
+	uint64_t					value;	// value of parameter
+	pst_context*				ctx;
 } pst_parameter;
 
-typedef struct __pst_context pst_context;
+typedef struct __pst_handler pst_handler;
 
 typedef struct __pst_function {
 	__pst_function(pst_context* ctx) : ctx(ctx)
@@ -57,12 +61,14 @@ typedef struct __pst_function {
 		line = -1;
 		die = NULL;
 		lowpc = 0;
+		highpc = 0;
 	}
 
 	bool unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr);
 	bool handle_dwarf(Dwarf_Die* d);
 
 	Dwarf_Addr					lowpc;
+	Dwarf_Addr					highpc;
 	Dwarf_Die*					die; 	// DWARF DIE containing definition of the function
 	std::string					name;	// function's name
 	std::vector<pst_parameter>	params;	// array of function's parameters
@@ -72,21 +78,18 @@ typedef struct __pst_function {
 	pst_context*				ctx;
 } pst_function;
 
-typedef struct __pst_context {
-	__pst_context(ucontext_t* hctx) : hcontext(hctx)
+typedef struct __pst_handler {
+	__pst_handler(ucontext_t* hctx) : ctx(hctx)
 	{
 		caller = NULL;
 		module = NULL;
 		dwfl = NULL;
-		offset = 0;
-		buff[0] = 0;
 		frame = NULL;
 		addr = 0;
-		base_addr = 0;
 		handle = 0;
 	}
 
-	~__pst_context()
+	~__pst_handler()
 	{
 		if(handle) {
 			dlclose(handle);
@@ -94,30 +97,20 @@ typedef struct __pst_context {
 	}
 
 
-	bool print(const char* fmt, ...);
 	void dwarf_print();
-	uint32_t print_expr_block(Dwarf_Op *exprs, int len, char* buff, uint32_t buff_size, Dwarf_Attribute* attr = 0);
-	void log(SC_LogSeverity severity, const char*fmt, ...);
+	bool calc_expr_block(Dwarf_Op *exprs, int exp_len, dwarf_stack* stack, Dwarf_Attribute* attr = 0);
 	bool unwind();
 	bool get_frame();
 	bool get_dwarf_function(pst_function& fun);
 
-	ucontext_t*					hcontext;// context of signal handler
-	unw_context_t				context;// context of stack trace
-	unw_cursor_t				cursor;	// currently examined frame of context
-	void*						handle;	// process handle
-	Dwarf_Addr 					addr;	// address of currently processed function
-	Dwarf_Addr					base_addr;// base address where process loaded
-	Dwfl* 						dwfl;	// DWARF context
-	Dwfl_Module* 				module;	// currently processed CU
-	Dwarf_Frame* 				frame;	// currently processed stack frame
-	void*						caller;	// pointer to the function which requested to unwind stack
-	std::vector<pst_function>	functions;// array of functions in stack frame
-	char						buff[8192]; // stack trace buffer
-	uint32_t					offset;	// offset in the 'buff'
-} pst_context;
-
-// libdw-based trace call stack implementation
-bool LibdwTraceCallStack(pst_context& ctx);
+	pst_context					ctx;		// context of unwinding
+	void*						handle;		// process handle
+	Dwarf_Addr 					addr;		// address of currently processed function
+	Dwfl* 						dwfl;		// DWARF context
+	Dwfl_Module* 				module;		// currently processed CU
+	Dwarf_Frame* 				frame;		// currently processed stack frame
+	void*						caller;		// pointer to the function which requested to unwind stack
+	std::vector<pst_function>	functions;	// array of functions in stack frame
+} pst_handler;
 
 #endif /* SC_SYSUTILS_H_ */

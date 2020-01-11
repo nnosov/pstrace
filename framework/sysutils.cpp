@@ -14,11 +14,10 @@
 #include <cxxabi.h>
 #include <execinfo.h>
 #include <dwarf.h>
+#include <inttypes.h>
 
-#include "logger/log.h"
 #include "sysutils.h"
-
-extern SC_LogBase* logger;
+#include "logger/log.h"
 
 #define USEI_LIBUNWIND
 
@@ -27,65 +26,11 @@ extern SC_LogBase* logger;
 #endif
 
 #include "common.h"
-
-bool __pst_context::print(const char* fmt, ...)
-{
-	bool nret = true;
-
-	va_list args;
-	va_start(args, fmt);
-	int size = sizeof(buff) - offset;
-	int ret = vsnprintf(buff + offset, size, fmt, args);
-	if(ret >= size || ret < 0) {
-		nret = false;
-	}
-	offset += ret;
-	va_end(args);
-
-	return nret;
-}
-
-void __pst_context::log(SC_LogSeverity severity, const char* fmt, ...)
-{
-	uint32_t    str_len = 0;
-	char        str[PATH_MAX]; str[0] = 0;
-	va_list args;
-	va_start(args, fmt);
-	str_len += vsnprintf(str + str_len, sizeof(str) - str_len, fmt, args);
-	va_end(args);
-
-	logger->Log(severity, "%s", str);
-}
+#include "dwarf_operations.h"
 
 // dwfl_addrsegment() possibly can be used to check address validity
 // dwarf_getattrs() allows to enumerate all DIE attributes
 // dwarf_getfuncs() allows to enumerate functions within CU
-
-bool is_location_form(int form)
-{
-    if (form == DW_FORM_block1 || form == DW_FORM_block2 || form == DW_FORM_block4 || form == DW_FORM_block ||
-    	form == DW_FORM_data4  || form == DW_FORM_data8  || form == DW_FORM_sec_offset) {
-        return true;
-    }
-    return false;
-}
-
-char* GetExecutableName(char* path, uint32_t size)
-{
-    char link[PATH_MAX];
-    snprintf(link, sizeof(link), "/proc/%d/exe", getpid());
-    int nret = readlink(link, path, size);
-    if (nret == -1) {
-        return NULL;
-    }
-
-    // trailing zero
-    path[nret] = 0;
-
-    return path;
-}
-
-#include <inttypes.h>
 
 typedef struct __reginfo {
 	__reginfo() {
@@ -166,69 +111,27 @@ void print_framereg(int regno)
 }
 */
 
-
-uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, uint32_t buff_size, Dwarf_Attribute* attr)
+bool __pst_handler::calc_expr_block(Dwarf_Op *exprs, int expr_len, dwarf_stack* stack, Dwarf_Attribute* attr)
 {
-	uint32_t offset = 0;
-	for (int i = 0; i < len; i++) {
-		//printf ("%s", (i + 1 < len ? ", " : ""));
+	for (int i = 0; i < expr_len; i++) {
 		const dwarf_op_map* map = find_op_map(exprs[i].atom);
-		if(map) {
-			if(map->op_num >= DW_OP_breg0 && map->op_num <= DW_OP_breg16) {
-				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number);
-
-				unw_word_t ptr = 0;
-				unw_get_reg(&cursor, map->regno, &ptr);
-				//ptr += off;
-
-				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s%s%d) reg_value: 0x%lX ", map->op_name, map->regname, off >=0 ? "+" : "", off, ptr);
-			} else if(map->op_num >= DW_OP_reg0 && map->op_num <= DW_OP_reg16) {
-				unw_word_t value = 0;
-				unw_get_reg(&cursor, map->regno, &value);
-				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s) value: 0x%lX", map->op_name, map->regname, value);
-			} else if(map->op_num == DW_OP_GNU_entry_value) {
-				uint32_t value = decode_uleb128((unsigned char*)&exprs[i].number);
-				offset += snprintf(buff + offset, buff_size - offset, "%s(%u, ", map->op_name, value);
-				Dwarf_Attribute attr_mem;
-				if(!dwarf_getlocation_attr(attr, exprs, &attr_mem)) {
-					Dwarf_Op *expr;
-					size_t exprlen;
-					if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
-						offset += print_expr_block (expr, exprlen, buff + offset, buff_size - offset, attr);
-						offset += snprintf(buff + offset, buff_size - offset, ") ");
-					} else {
-						log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
-					}
-				} else {
-					log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
-				}
-			} else if(map->op_num == DW_OP_stack_value) {
-				offset += snprintf(buff + offset, buff_size - offset, "%s", map->op_name);
-			} else if(map->op_num == DW_OP_plus_uconst) {
-				uint32_t value = decode_uleb128((unsigned char*)&exprs[i].number);
-				offset += snprintf(buff + offset, buff_size - offset, "%s(+%u) ", map->op_name, value);
-			} else if(map->op_num == DW_OP_bregx) {
-				uint32_t regno = decode_uleb128((unsigned char*)&exprs[i].number);
-				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number2);
-
-				unw_word_t ptr = 0;
-				unw_get_reg(&cursor, map->regno, &ptr);
-				//ptr += off;
-
-				offset += snprintf(buff + offset, buff_size - offset, "%s(%s%s%d) reg_value = 0x%lX", map->op_name, unw_regname(regno), off >= 0 ? "+" : "", off, ptr);
-			} else {
-				offset += snprintf(buff + offset, buff_size - offset, "%s(0x%lX, 0x%lx) ", map->op_name, exprs[i].number, exprs[i].number2);
-			}
-		} else {
-			offset += snprintf(buff + offset, buff_size - offset, "0x%hhX(0x%lX, 0x%lx) ", exprs[i].atom, exprs[i].number, exprs[i].number2);
+		if(!map) {
+			ctx.log(SEVERITY_ERROR, "Unknown operation type 0x%hhX", exprs[i].atom);
+			return false;
 		}
-//		if(exprs[i].atom >= DW_OP_reg0 && exprs[i].atom <= DW_OP_bregx) {
-//			print_framereg(exprs[i].atom);
-//		}
+
+		if(map->op_num == DW_OP_stack_value && stack->Size() > 0) {
+			return true;
+		}
+
+		if(!map->operation(&ctx, map, exprs[i].number, exprs[i].number2)) {
+			return false;
+		}
 	}
 
-	return offset;
+	return true;
 }
+
 
 bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 {
@@ -239,7 +142,7 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 	Dwarf_Die ret_die;
 
 	if(!dwarf_formref_die(param, &ret_die)) {
-		function->ctx->log(SEVERITY_ERROR, "Failed to get parameter DIE");
+		ctx->log(SEVERITY_ERROR, "Failed to get parameter DIE");
 		return false;
 	}
 
@@ -251,35 +154,47 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 			if(attr) {
 				dwarf_formudata(attr, &size);
 			}
-			function->ctx->log(SEVERITY_INFO, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
+			ctx->log(SEVERITY_INFO, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
 			types.push_back(dwarf_diename(&ret_die));
 			break;
 		}
 		case DW_TAG_array_type:
-			logger->Log(SEVERITY_INFO, "array type");
+			ctx->log(SEVERITY_INFO, "array type");
 			types.push_back("[]");
 			break;
+		case DW_TAG_structure_type:
+			ctx->log(SEVERITY_INFO, "structure type");
+			types.push_back("struct");
+			break;
+		case DW_TAG_union_type:
+			ctx->log(SEVERITY_INFO, "union type");
+			types.push_back("union");
+			break;
+		case DW_TAG_class_type:
+			ctx->log(SEVERITY_INFO, "class type");
+			types.push_back("class");
+			break;
 		case DW_TAG_pointer_type:
-			logger->Log(SEVERITY_INFO, "pointer type");
+			ctx->log(SEVERITY_INFO, "pointer type");
 			types.push_back("*");
 			break;
 		case DW_TAG_enumeration_type:
-			logger->Log(SEVERITY_INFO, "enumeration type");
+			ctx->log(SEVERITY_INFO, "enumeration type");
 			types.push_back("enum");
 			break;
 		case DW_TAG_const_type:
-			logger->Log(SEVERITY_INFO, "constant type");
+			ctx->log(SEVERITY_INFO, "constant type");
 			types.push_back("const");
 			break;
 		case DW_TAG_subroutine_type:
-			logger->Log(SEVERITY_INFO, "subroutine type");
+			ctx->log(SEVERITY_INFO, "subroutine type");
 			break;
 		case DW_TAG_typedef:
-			logger->Log(SEVERITY_INFO, "typedef '%s' type", dwarf_diename(&ret_die));
+			ctx->log(SEVERITY_INFO, "typedef '%s' type", dwarf_diename(&ret_die));
 			types.push_back(dwarf_diename(&ret_die));
 			break;
 		default:
-			logger->Log(SEVERITY_INFO, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
+			ctx->log(SEVERITY_INFO, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
 			break;
 	}
 
@@ -300,7 +215,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 
 	// Get reference to attribute type of the parameter/variable
 	attr = dwarf_attr(result, DW_AT_type, &attr_mem);
-	function->ctx->log(SEVERITY_INFO, "Handle '%s' %s", dwarf_diename(result), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
+	ctx->log(SEVERITY_INFO, "Handle '%s' %s", dwarf_diename(result), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
 	if(attr) {
 		handle_type(attr);
 	}
@@ -313,8 +228,8 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 			size_t exprlen;
 			if (dwarf_getlocation(attr, &expr, &exprlen) == 0) {
 				char str[1024]; str[0] = 0;
-				function->ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-				function->ctx->log(SEVERITY_DEBUG, "Found DW_AT_location expression: %s", str);
+				ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
+				ctx->log(SEVERITY_DEBUG, "Found DW_AT_location expression: %s", str);
 //				if(expr[0].atom >= DW_OP_reg0 && expr[0].atom <= DW_OP_bregx) {
 //					print_framereg(expr[0].atom);
 //				}
@@ -327,12 +242,12 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 
 			for(int i = 0; (off = dwarf_getlocations (attr, off, &base, &start, &end, &expr, &exprlen)) > 0; ++i) {
 				char str[1024]; str[0] = 0;
-				function->ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-				function->ctx->log(SEVERITY_DEBUG, "[%d] low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 " ==> %s", i, start, end, str);
+				ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
+				ctx->log(SEVERITY_DEBUG, "[%d] low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 " ==> %s", i, start, end, str);
 			}
 
 		} else {
-			function->ctx->log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X, ", attr->form, attr->code);
+			ctx->log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X, ", attr->form, attr->code);
 		}
 	}
 
@@ -346,16 +261,22 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
 
-	// get offset to function in memory against base address where process executed
-	dwarf_lowpc(d, &lowpc);
-    Dwarf_Addr highpc;
-    dwarf_highpc(d, &highpc);
+	// get list of offsets from process base address of continuous memory ranges where function's code resides
+//	if(dwarf_haspc(d, pc)) {
+		dwarf_lowpc(d, &lowpc);
+		dwarf_highpc(d, &highpc);
+//	} else {
+//		ctx->log(SEVERITY_ERROR, "Function's '%s' DIE hasn't definitions of memory offsets of function's code", dwarf_diename(d));
+//		return false;
+//	}
 
     unw_proc_info_t info;
     unw_get_proc_info(&ctx->cursor, &info);
+	unw_word_t sp;
+	unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp);
 
-    logger->Log(SEVERITY_INFO, "Found function in debug info. name = %s(...), PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, info start = 0x%lX, offset from info start: 0x%lX",
-    		dwarf_diename(d), pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr);
+    ctx->log(SEVERITY_INFO, "Found function in debug info. name = %s(...), PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, stack address: 0x%lX",
+    		dwarf_diename(d), pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr, sp);
 
 	// determine function's stack frame base
 	attr = dwarf_attr(die, DW_AT_frame_base, &attr_mem);
@@ -375,7 +296,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 
 	// Get reference to return attribute type of the function
 	// may be to use dwfl_module_return_value_location() instead
-	pst_parameter ret_p(this); ret_p.is_return = true;
+	pst_parameter ret_p(ctx); ret_p.is_return = true;
 	attr = dwarf_attr(die, DW_AT_type, &attr_mem);
 	if(attr) {
 		ctx->log(SEVERITY_INFO, "Handle return parameter");
@@ -394,7 +315,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 
 	// went through parameters and local variables of the function
 	do {
-		pst_parameter param(this);
+		pst_parameter param(ctx);
 
 		switch (dwarf_tag(&result)) {
 		case DW_TAG_formal_parameter:
@@ -467,7 +388,7 @@ bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
 }
 
 
-bool __pst_context::get_frame()
+bool __pst_handler::get_frame()
 {
     // get CFI (Call Frame Information) for current module
     // from handle_cfi()
@@ -475,7 +396,7 @@ bool __pst_context::get_frame()
     Dwarf_CFI* cfi = dwfl_module_eh_cfi(module, &mod_bias);
     //Dwarf_CFI* cfi = dwfl_module_dwarf_cfi(module, &mod_bias);
     if(!cfi) {
-    	log(SEVERITY_INFO, "Cannot find CFI for module");
+    	ctx.log(SEVERITY_INFO, "Cannot find CFI for module");
     	return false;
     }
 
@@ -483,7 +404,7 @@ bool __pst_context::get_frame()
     int result = dwarf_cfi_addrframe (cfi, addr - mod_bias, &frame);
     if (result == 0) {
     	// get frame information
-    	log(SEVERITY_INFO, "Found CFI frame for module");
+    	ctx.log(SEVERITY_INFO, "Found CFI frame for module");
     	Dwarf_Addr start = addr;
     	Dwarf_Addr end = addr;
     	bool signalp;
@@ -492,13 +413,13 @@ bool __pst_context::get_frame()
     		start += mod_bias;
     		end += mod_bias;
     	}
-    	log(SEVERITY_DEBUG, "Per '.eh_frame' info has %#" PRIx64 " => [%#" PRIx64 ", %#" PRIx64 "] in_signal = %s", addr, start, end, signalp ? "true" : "false");
+    	ctx.log(SEVERITY_DEBUG, "Per '.eh_frame' info has %#" PRIx64 " => [%#" PRIx64 ", %#" PRIx64 "] in_signal = %s", addr, start, end, signalp ? "true" : "false");
     	if (ra_regno < 0)
-    		log(SEVERITY_DEBUG, "return address register unavailable (%s)", dwarf_errmsg(0));
+    		ctx.log(SEVERITY_DEBUG, "return address register unavailable (%s)", dwarf_errmsg(0));
     	else {
     		reginfo info; info.regno = ra_regno;
     		dwfl_module_register_names(module, regname_callback, &info);
-    		log(SEVERITY_DEBUG, "return address in reg%u%s ==> %s", ra_regno, signalp ? " (signal frame)" : "", info.regname);
+    		ctx.log(SEVERITY_DEBUG, "return address in reg%u%s ==> %s", ra_regno, signalp ? " (signal frame)" : "", info.regname);
     	}
 
     	// finally get CFA (Canonical Frame Address)
@@ -509,33 +430,33 @@ bool __pst_context::get_frame()
     	size_t cfa_nops;
     	result = dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops);
     	char str[1024]; str[0] = 0;
-    	print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
-    	log(SEVERITY_INFO, "Found CFA expression: %s", str);
+    	ctx.print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
+    	ctx.log(SEVERITY_INFO, "Found CFA expression: %s", str);
     	//print_detail (result, cfa_ops, cfa_nops, mod_bias, "\tCFA ");
     }
 
     return true;
 }
 
-bool __pst_context::get_dwarf_function(pst_function& fun)
+bool __pst_handler::get_dwarf_function(pst_function& fun)
 {
     Dwarf_Addr mod_cu = 0;
     // get CU(Compilation Unit) debug definition
     Dwarf_Die* cdie = dwfl_module_addrdie(module, addr, &mod_cu);
     //Dwarf_Die* cdie = dwfl_addrdie(dwfl, addr, &mod_bias);
     if(!cdie) {
-    	logger->Log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", addr);
+    	ctx.log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", addr);
     	return false;
     }
 
     if(dwarf_tag(cdie) != DW_TAG_compile_unit) {
-    	logger->Log(SEVERITY_DEBUG, "Skipping non-cu die. DWARF tag: 0x%X, name = %s", dwarf_tag(cdie), dwarf_diename(cdie));
+    	ctx.log(SEVERITY_DEBUG, "Skipping non-cu die. DWARF tag: 0x%X, name = %s", dwarf_tag(cdie), dwarf_diename(cdie));
     	return false;
     }
 
     Dwarf_Die result;
 	if(dwarf_child(cdie, &result)) {
-		logger->Log(SEVERITY_ERROR, "No child DIE found for CU %s", dwarf_diename(cdie));
+		ctx.log(SEVERITY_ERROR, "No child DIE found for CU %s", dwarf_diename(cdie));
 		return false;
 	}
 
@@ -553,7 +474,7 @@ bool __pst_context::get_dwarf_function(pst_function& fun)
 	return nret;
 }
 
-void __pst_context::dwarf_print()
+void __pst_handler::dwarf_print()
 {
 
 }
@@ -568,10 +489,10 @@ Dwfl_Callbacks callbacks = {
 
 #include <dlfcn.h>
 
-bool __pst_context::unwind()
+bool __pst_handler::unwind()
 {
 #ifdef REG_RIP // x86_64
-    caller = (void *) hcontext->uc_mcontext.gregs[REG_RIP];
+    caller = (void *) ctx.hcontext->uc_mcontext.gregs[REG_RIP];
 #elif defined(REG_EIP) // x86_32
     caller_address = (void *) uctx->uc_mcontext.gregs[REG_EIP]);
 #elif defined(__arm__)
@@ -591,8 +512,8 @@ bool __pst_context::unwind()
     handle = dlopen(NULL, RTLD_NOW);
 	Dl_info info;
 	dladdr(caller, &info);
-	base_addr = (uint64_t)info.dli_fbase;
-	logger->Log(SEVERITY_INFO, "Process address information: dlopen handle: %p, base address: %p, object name: %s, symbol name: %s", handle, info.dli_fbase, info.dli_fname, info.dli_sname);
+	ctx.base_addr = (uint64_t)info.dli_fbase;
+	ctx.log(SEVERITY_INFO, "Process address information: base address: %p, object name: %s", info.dli_fbase, info.dli_fname);
 
     int skipped = 0;
 #ifndef USEI_LIBUNWIND
@@ -604,27 +525,27 @@ bool __pst_context::unwind()
 #else
     unw_word_t  	pc;
 
-    unw_getcontext(&context);
-    unw_init_local(&cursor, &context);
-    while (unw_step(&cursor) > 0) {
-    	unw_get_reg(&cursor, UNW_REG_IP,  &pc);
+    unw_getcontext(&ctx.context);
+    unw_init_local(&ctx.cursor, &ctx.context);
+    while (unw_step(&ctx.cursor) > 0) {
+    	unw_get_reg(&ctx.cursor, UNW_REG_IP,  &pc);
     	if(pc == (uint64_t)caller) {
     		break;
     	} else {
     		++skipped;
     	}
     }
-    print("Stack trace(caller = %p. Skipped stack frames: %d):\n", caller, skipped);
+    ctx.print("Stack trace(caller = %p. Skipped stack frames: %d):\n", caller, skipped);
 #endif
 
     dwfl = dwfl_begin(&callbacks);
     if(dwfl == NULL) {
-        print("Failed to initialize libdw session for parse stack frames");
+    	ctx.print("Failed to initialize libdw session for parse stack frames");
         return false;
     }
 
     if(dwfl_linux_proc_report(dwfl, getpid()) != 0 || dwfl_report_end(dwfl, NULL, NULL) !=0) {
-    	print("Failed to parse debug section of executable");
+    	ctx.print("Failed to parse debug section of executable");
     	return false;
     }
 
@@ -634,21 +555,21 @@ bool __pst_context::unwind()
     	Dwarf_Addr addr = (uintptr_t)array[i];
 #else
    for (int i = skipped, idx = 0; true ; ++i, ++idx) {
-   		unw_get_reg(&cursor, UNW_REG_IP,  &pc);
+   		unw_get_reg(&ctx.cursor, UNW_REG_IP,  &pc);
    		addr = pc;
-   		print("[%-2d] ", idx);
+   		ctx.print("[%-2d] ", idx);
 #endif
    		module = dwfl_addrmodule(dwfl, addr);
    		get_frame();
-   		pst_function fun(this);
+   		pst_function fun(&ctx);
    		if(fun.unwind(dwfl, module, pc)) {
    			if(get_dwarf_function(fun)) {
    				functions.push_back(fun);
    			}
    		}
-   		print("\n");
+   		ctx.print("\n");
 #ifdef USEI_LIBUNWIND
-   		if(unw_step(&cursor) <= 0) {
+   		if(unw_step(&ctx.cursor) <= 0) {
    			break;
    		}
 #endif
