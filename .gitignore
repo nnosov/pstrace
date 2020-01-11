@@ -1,0 +1,4 @@
+.settings
+framework/build/
+build/
+services/manager/build/
