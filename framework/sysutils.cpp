@@ -111,12 +111,12 @@ void print_framereg(int regno)
 }
 */
 
-bool __pst_handler::calc_expr_block(Dwarf_Op *exprs, int expr_len, dwarf_stack* stack, Dwarf_Attribute* attr)
+bool __pst_handler::calc_expression(Dwarf_Op *exprs, int expr_len, dwarf_stack* stack, Dwarf_Attribute* attr)
 {
 	for (int i = 0; i < expr_len; i++) {
 		const dwarf_op_map* map = find_op_map(exprs[i].atom);
 		if(!map) {
-			ctx.log(SEVERITY_ERROR, "Unknown operation type 0x%hhX", exprs[i].atom);
+			ctx.log(SEVERITY_ERROR, "Unknown operation type 0x%hhX(0x%lX, 0x%lX)", exprs[i].atom, exprs[i].number, exprs[i].number2);
 			return false;
 		}
 
@@ -125,6 +125,7 @@ bool __pst_handler::calc_expr_block(Dwarf_Op *exprs, int expr_len, dwarf_stack* 
 		}
 
 		if(!map->operation(&ctx, map, exprs[i].number, exprs[i].number2)) {
+			ctx.log(SEVERITY_ERROR, "Failed to calculate %s(0x%lX, 0x%lX) operation", map->op_name, exprs[i].number, exprs[i].number2);
 			return false;
 		}
 	}

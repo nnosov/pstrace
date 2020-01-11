@@ -98,7 +98,7 @@ typedef struct __pst_handler {
 
 
 	void dwarf_print();
-	bool calc_expr_block(Dwarf_Op *exprs, int exp_len, dwarf_stack* stack, Dwarf_Attribute* attr = 0);
+	bool calc_expression(Dwarf_Op *exprs, int exp_len, dwarf_stack* stack, Dwarf_Attribute* attr = 0);
 	bool unwind();
 	bool get_frame();
 	bool get_dwarf_function(pst_function& fun);

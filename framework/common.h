@@ -8,24 +8,35 @@
 #include "logger/log.h"
 #include "linkedlist.h"
 
+typedef enum {
+	DWARF_TYPE_INVALID = 0,
+	DWARF_TYPE_UNSIGNED,
+	DWARF_TYPE_SIGNED,
+	DWARF_TYPE_ADDRESS,
+	DWARF_TYPE_GENERIC
+} dwarf_value_type;
+
 typedef struct __dwarf_value : public SC_ListNode {
 	__dwarf_value(uint32_t s)
 	{
 		size = s;
 		value = (char*)malloc(s);
+		type = DWARF_TYPE_INVALID;
 	}
 
-	__dwarf_value(char*v, uint32_t s)
+	__dwarf_value(char*v, uint32_t s, dwarf_value_type t)
 	{
 		size = s;
 		value = (char*)malloc(s);
 		memcpy(value, v, s);
+		type = t;
 	}
 
 	__dwarf_value()
 	{
 		value = NULL;
 		size = 0;
+		type = DWARF_TYPE_INVALID;
 	}
 
 	~__dwarf_value()
@@ -37,8 +48,69 @@ typedef struct __dwarf_value : public SC_ListNode {
 		}
 	}
 
-	char* 		value;
-	uint32_t 	size;
+	void replace(void* v, uint32_t s, dwarf_value_type t)
+	{
+		if(value) {
+			free(value);
+			size = 0;
+			type = DWARF_TYPE_INVALID;
+		}
+
+		value = (char*)malloc(s);
+		memcpy(value, v, s);
+		size = s;
+		type = t;
+	}
+
+	bool get_uint(uint64_t v)
+	{
+		switch (size) {
+		case 1:
+			v = (uint8_t)*((uint8_t*)value);
+			break;
+		case 2:
+			v = (uint16_t)*((uint16_t*)value);
+			break;
+		case 4:
+			v = (uint32_t)*((uint32_t*)value);
+			break;
+		case 8:
+			v = (uint64_t)*((uint64_t*)value);
+			break;
+		default:
+			return false;
+			break;
+		}
+
+		return true;
+	}
+
+	bool get_int(int64_t v)
+	{
+		switch (size) {
+		case 1:
+			v = (int8_t)*((int8_t*)value);
+			break;
+		case 2:
+			v = (int16_t)*((int16_t*)value);
+			break;
+		case 4:
+			v = (int32_t)*((int32_t*)value);
+			break;
+		case 8:
+			v = (int64_t)*((int64_t*)value);
+			break;
+		default:
+			return false;
+			break;
+		}
+
+		return true;
+	}
+
+	char* 				value;
+	uint32_t 			size;
+	dwarf_value_type	type;
 } dwarf_value;
 
 typedef struct __dwarf_stack : public SC_ListHead {
@@ -49,8 +121,8 @@ typedef struct __dwarf_stack : public SC_ListHead {
 		}
 	}
 
-	void push(char* v, uint32_t s) {
-		dwarf_value* value = new dwarf_value(v, s);
+	void push(void* v, uint32_t s, dwarf_value_type t) {
+		dwarf_value* value = new dwarf_value((char*)v, s, t);
 		InsertFirst(value);
 	}
 
@@ -66,6 +138,15 @@ typedef struct __dwarf_stack : public SC_ListHead {
 
 		return value;
 	}
+	dwarf_value* get(uint32_t idx = 0) {
+		dwarf_value* value = NULL;
+		for(value = (dwarf_value*)First(); value && idx; value = (dwarf_value*)Next(value)) {
+			idx--;
+		}
+
+		return value;
+	}
+
 } dwarf_stack;
 
 typedef struct __pst_context {
