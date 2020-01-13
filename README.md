@@ -2,6 +2,8 @@
 
 The goal of the project is to enable C/C++ developers to get informative  stack trace in case of program crash (inside of signal handler). Key feature is to log not only function address/name/line etc but (if DWARF .debug_info section is present) values of function's parameters and variables.
 
+Currently development focused on x86_64 architecture and for Linux OS, but further may be expanded to other architectures and OS if it will be demanded and some people will like to contribute to the project to support this architecture and OS.
+
 As a first stage the goal is to dump only C/C++ base types such as pointer, boolean, integer etc.
 
 Second stage dump composite types such as C structures, C++ classes, arrays etc.
