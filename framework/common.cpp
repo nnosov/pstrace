@@ -175,9 +175,6 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 		} else {
 			offset += snprintf(buff + offset, buff_size - offset, "0x%hhX(0x%lX, 0x%lx) ", exprs[i].atom, exprs[i].number, exprs[i].number2);
 		}
-//		if(exprs[i].atom >= DW_OP_reg0 && exprs[i].atom <= DW_OP_bregx) {
-//			print_framereg(exprs[i].atom);
-//		}DW_OP_addr
 	}
 
 	return offset;
@@ -194,7 +191,7 @@ bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
         }
 
         dwarf_value* v = stack.get();
-        if(v && v->type == DWARF_TYPE_REGISTER_LOC) {
+        if(v && (v->type & DWARF_TYPE_REGISTER_LOC)) {
             // dereference register location
             unw_word_t value = 0;
             uint64_t regno = *((uint64_t*)v->value);

@@ -9,19 +9,19 @@
 #include "linkedlist.h"
 
 typedef enum {
-	DWARF_TYPE_INVALID 		= 0,
-	DWARF_TYPE_SIGNED 		= 1,
-	DWARF_TYPE_UNSIGNED 	= 2,
-	DWARF_TYPE_CONST        = 4,
-	DWARF_TYPE_GENERIC      = 8,
-	DWARF_TYPE_CHAR         = 16,
-	DWARF_TYPE_FLOAT        = 32,
-	DWARF_TYPE_REGISTER_LOC = 64,
-	DWARF_TYPE_MEMORY_LOC   = 128,
-	DWARF_TYPE_PIECE        = 256,
-	DWARF_TYPE_SHORT        = 512,
-	DWARF_TYPE_INT          = 1024,
-	DWARF_TYPE_LONG         = 2048
+	DWARF_TYPE_INVALID 		= 0,    // no type
+	DWARF_TYPE_SIGNED 		= 1,    // signed type
+	DWARF_TYPE_UNSIGNED 	= 2,    // unsigned type
+	DWARF_TYPE_CONST        = 4,    // constant signed/unsigned type
+	DWARF_TYPE_GENERIC      = 8,    // size of machine address type
+	DWARF_TYPE_CHAR         = 16,   // 1 byte size
+	DWARF_TYPE_FLOAT        = 32,   // machine-dependent floating point size
+	DWARF_TYPE_REGISTER_LOC = 64,   // value located in register specified as 'value'
+	DWARF_TYPE_MEMORY_LOC   = 128,  // value located in memory address specified as 'value'
+	DWARF_TYPE_PIECE        = 256,  // piece of whole value located in current value
+	DWARF_TYPE_SHORT        = 512,  // 2 byte size
+	DWARF_TYPE_INT          = 1024, // 4 byte size
+	DWARF_TYPE_LONG         = 2048  // 8 byte size
 } dwarf_value_type;
 
 typedef struct __dwarf_value : public SC_ListNode {
