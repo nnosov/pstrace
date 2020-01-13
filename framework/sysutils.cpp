@@ -111,29 +111,6 @@ void print_framereg(int regno)
 }
 */
 
-bool __pst_handler::calc_expression(Dwarf_Op *exprs, int expr_len, dwarf_stack* stack, Dwarf_Attribute* attr)
-{
-	for (int i = 0; i < expr_len; i++) {
-		const dwarf_op_map* map = find_op_map(exprs[i].atom);
-		if(!map) {
-			ctx.log(SEVERITY_ERROR, "Unknown operation type 0x%hhX(0x%lX, 0x%lX)", exprs[i].atom, exprs[i].number, exprs[i].number2);
-			return false;
-		}
-
-		if(map->op_num == DW_OP_stack_value && stack->Size() > 0) {
-			return true;
-		}
-
-		if(!map->operation(&ctx, map, exprs[i].number, exprs[i].number2)) {
-			ctx.log(SEVERITY_ERROR, "Failed to calculate %s(0x%lX, 0x%lX) operation", map->op_name, exprs[i].number, exprs[i].number2);
-			return false;
-		}
-	}
-
-	return true;
-}
-
-
 bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 {
 	Dwarf_Attribute attr_mem;
@@ -221,6 +198,10 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 		handle_type(attr);
 	}
 
+	Dwarf_Addr pc;
+	unw_get_reg(&ctx->cursor, UNW_REG_IP,  &pc);
+	Dwarf_Addr offset = pc - ctx->base_addr;
+
 	// determine location of parameter in stack/heap or CPU registers
 	attr = dwarf_attr(result, DW_AT_location, &attr_mem);
 	if(attr) {
@@ -230,10 +211,8 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 			if (dwarf_getlocation(attr, &expr, &exprlen) == 0) {
 				char str[1024]; str[0] = 0;
 				ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-				ctx->log(SEVERITY_DEBUG, "Found DW_AT_location expression: %s", str);
-//				if(expr[0].atom >= DW_OP_reg0 && expr[0].atom <= DW_OP_bregx) {
-//					print_framereg(expr[0].atom);
-//				}
+				ctx->log(SEVERITY_DEBUG, "DW_AT_location expression: %s", str);
+				ctx->calc_expression(expr, exprlen, attr);
 			}
 		} else if(dwarf_hasform(attr, DW_FORM_sec_offset)) {
 			Dwarf_Addr base, start, end;
@@ -241,10 +220,17 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 			Dwarf_Op *expr;
 			size_t exprlen;
 
+			// handle list of possible locations of parameter
 			for(int i = 0; (off = dwarf_getlocations (attr, off, &base, &start, &end, &expr, &exprlen)) > 0; ++i) {
-				char str[1024]; str[0] = 0;
-				ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-				ctx->log(SEVERITY_DEBUG, "[%d] low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 " ==> %s", i, start, end, str);
+			    if(offset >= start && offset <= end) {
+			        // actual location, try to calculate Location expression and retrieve value of parameter
+			        char str[1024]; str[0] = 0;
+			        ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
+			        ctx->log(SEVERITY_DEBUG, "Location list expression: [%d] low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 " ==> %s", i, start, end, str);
+			        ctx->calc_expression(expr, exprlen, attr);
+			    } else {
+			        // Location skipped due to don't match current PC offset
+			    }
 			}
 
 		} else {
@@ -561,7 +547,7 @@ bool __pst_handler::unwind()
    		ctx.print("[%-2d] ", idx);
 #endif
    		module = dwfl_addrmodule(dwfl, addr);
-   		get_frame();
+   		//get_frame();
    		pst_function fun(&ctx);
    		if(fun.unwind(dwfl, module, pc)) {
    			if(get_dwarf_function(fun)) {

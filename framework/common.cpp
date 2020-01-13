@@ -20,6 +20,73 @@
 
 extern SC_LogBase* logger;
 
+bool dwarf_value::get_int(int64_t& v)
+{
+    switch (size) {
+    case 1:
+        v = *((int8_t*)value);
+        break;
+    case 2:
+        v = *((int16_t*)value);
+        break;
+    case 4:
+        v = *((int32_t*)value);
+        break;
+    case 8:
+        v = *((int64_t*)value);
+        break;
+    default:
+        return false;
+        break;
+    }
+
+    return true;
+}
+
+bool dwarf_value::get_uint(uint64_t& v)
+{
+    if(type & DWARF_TYPE_SIGNED) {
+        int64_t sig;
+        if(!get_int(sig)) {
+            return false;
+        }
+        v = llabs(sig);
+    } else {
+        return get_generic(v);
+    }
+
+    return true;
+}
+
+__dwarf_value& dwarf_value::operator+=(const __dwarf_value& rhs)
+{
+
+    return *this;
+}
+
+bool dwarf_value::get_generic(uint64_t& v)
+{
+    switch (size) {
+        case 1:
+            v = *((uint8_t*)value);
+            break;
+        case 2:
+            v = *((uint16_t*)value);
+            break;
+        case 4:
+            v = *((uint32_t*)value);
+            break;
+        case 8:
+            v = *((uint64_t*)value);
+            break;
+        default:
+            return false;
+            break;
+    }
+
+    return true;
+}
+
 bool __pst_context::print(const char* fmt, ...)
 {
 	bool nret = true;
@@ -58,16 +125,17 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 		if(map) {
 			if(map->op_num >= DW_OP_breg0 && map->op_num <= DW_OP_breg16) {
 				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number);
-
+				int regno = map->op_num - DW_OP_breg0;
 				unw_word_t ptr = 0;
-				unw_get_reg(&cursor, map->regno, &ptr);
+				unw_get_reg(&cursor, regno, &ptr);
 				//ptr += off;
 
-				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s%s%d) reg_value: 0x%lX ", map->op_name, map->regname, off >=0 ? "+" : "", off, ptr);
+				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s%s%d) reg_value: 0x%lX ", map->op_name, unw_regname(regno), off >=0 ? "+" : "", off, ptr);
 			} else if(map->op_num >= DW_OP_reg0 && map->op_num <= DW_OP_reg16) {
 				unw_word_t value = 0;
-				unw_get_reg(&cursor, map->regno, &value);
-				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s) value: 0x%lX", map->op_name, map->regname, value);
+				int regno = map->op_num - DW_OP_reg0;
+				unw_get_reg(&cursor, regno, &value);
+				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s) value: 0x%lX", map->op_name, unw_regname(regno), value);
 			} else if(map->op_num == DW_OP_GNU_entry_value) {
 				uint32_t value = decode_uleb128((unsigned char*)&exprs[i].number);
 				offset += snprintf(buff + offset, buff_size - offset, "%s(%u, ", map->op_name, value);
@@ -76,7 +144,7 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 					Dwarf_Op *expr;
 					size_t exprlen;
 					if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
-						offset += print_expr_block (expr, exprlen, buff + offset, buff_size - offset, attr);
+						offset += print_expr_block (expr, exprlen, buff + offset, buff_size - offset, &attr_mem);
 						offset += snprintf(buff + offset, buff_size - offset, ") ");
 					} else {
 						log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
@@ -94,7 +162,7 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number2);
 
 				unw_word_t ptr = 0;
-				unw_get_reg(&cursor, map->regno, &ptr);
+				unw_get_reg(&cursor, regno, &ptr);
 				//ptr += off;
 
 				offset += snprintf(buff + offset, buff_size - offset, "%s(%s%s%d) reg_value = 0x%lX", map->op_name, unw_regname(regno), off >= 0 ? "+" : "", off, ptr);
@@ -119,6 +187,58 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 	}
 
 	return offset;
+}
+
+bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr)
+{
+    stack.clear();
+    for (int i = 0; i < expr_len; i++) {
+        const dwarf_op_map* map = find_op_map(exprs[i].atom);
+        if(!map) {
+            log(SEVERITY_ERROR, "Unknown operation type 0x%hhX(0x%lX, 0x%lX)", exprs[i].atom, exprs[i].number, exprs[i].number2);
+            return false;
+        }
+
+        dwarf_value* v = stack.get();
+        if(v && v->type == DWARF_TYPE_REGISTER_LOC) {
+            // dereference register location
+            unw_word_t value = 0;
+            uint64_t regno = *((uint64_t*)v->value);
+            if(unw_get_reg(&cursor, regno, &value)) {
+                log(SEVERITY_ERROR, "Failed to ger value of register 0x%lX", regno);
+                return false;
+            }
+            v->replace(&value, sizeof(value), DWARF_TYPE_GENERIC);
+        }
+
+        if(!map->operation(this, map, exprs[i].number, exprs[i].number2)) {
+            log(SEVERITY_ERROR, "Failed to calculate %s(0x%lX, 0x%lX) operation", map->op_name, exprs[i].number, exprs[i].number2);
+            return false;
+        }
+
+    }
+
+    if(stack.Size()) {
+        unw_word_t value = 0;
+        dwarf_value* v = stack.get();
+        v->get_uint(value);
+        if(v->type & DWARF_TYPE_REGISTER_LOC) {
+            // dereference register location
+            uint64_t regno;
+            v->get_uint(regno);
+            if(unw_get_reg(&cursor, regno, &value)) {
+                log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
+                return false;
+            }
+        }
+        log(SEVERITY_INFO, "Found 0x%X value of location expression", value);
+        return true;
+    } else {
+        log(SEVERITY_ERROR, "No value found for location expression");
+        return false;
+    }
+
+    return true;
 }
 
 bool is_location_form(int form)
@@ -157,22 +277,22 @@ uint32_t decode_uleb128(uint8_t *uleb128)
 
 // Utility function to encode a ULEB128 value to a buffer. Returns
 // the length in bytes of the encoded value.
-inline unsigned encodeULEB128(uint64_t Value, uint8_t *p, unsigned PadTo = 0)
+inline unsigned encode_uleb128(uint64_t value, uint8_t *p, unsigned PadTo = 0)
 {
 	uint8_t *orig_p = p;
-	unsigned Count = 0;
+	unsigned count = 0;
 	do {
-		uint8_t Byte = Value & 0x7f;
-		Value >>= 7;
-		Count++;
-		if (Value != 0 || Count < PadTo)
+		uint8_t Byte = value & 0x7f;
+		value >>= 7;
+		count++;
+		if (value != 0 || count < PadTo)
 			Byte |= 0x80; // Mark this byte to show that more bytes will follow.
 		*p++ = Byte;
-	} while (Value != 0);
+	} while (value != 0);
 
 	// Pad with 0x80 and emit a null byte at the end.
-	if (Count < PadTo) {
-		for (; Count < PadTo - 1; ++Count)
+	if (count < PadTo) {
+		for (; count < PadTo - 1; ++count)
 			*p++ = '\x80';
 		*p++ = '\x00';
 	}
@@ -182,27 +302,27 @@ inline unsigned encodeULEB128(uint64_t Value, uint8_t *p, unsigned PadTo = 0)
 
 // Utility function to encode a SLEB128 value to a buffer. Returns
 // the length in bytes of the encoded value.
-inline unsigned encodeSLEB128(int64_t Value, uint8_t *p, unsigned PadTo = 0)
+inline unsigned encode_sleb128(int64_t value, uint8_t *p, unsigned PadTo = 0)
 {
 	uint8_t *orig_p = p;
-	unsigned Count = 0;
+	unsigned count = 0;
 	bool More;
 	do {
-		uint8_t Byte = Value & 0x7f;
+		uint8_t Byte = value & 0x7f;
 		// NOTE: this assumes that this signed shift is an arithmetic right shift.
-		Value >>= 7;
-		More = !((((Value == 0 ) && ((Byte & 0x40) == 0)) ||
-				((Value == -1) && ((Byte & 0x40) != 0))));
-		Count++;
-		if (More || Count < PadTo)
+		value >>= 7;
+		More = !((((value == 0 ) && ((Byte & 0x40) == 0)) ||
+				((value == -1) && ((Byte & 0x40) != 0))));
+		count++;
+		if (More || count < PadTo)
 			Byte |= 0x80; // Mark this byte to show that more bytes will follow.
 		*p++ = Byte;
 	} while (More);
 
 	// Pad with 0x80 and emit a terminating byte at the end.
-	if (Count < PadTo) {
-		uint8_t PadValue = Value < 0 ? 0x7f : 0x00;
-		for (; Count < PadTo - 1; ++Count)
+	if (count < PadTo) {
+		uint8_t PadValue = value < 0 ? 0x7f : 0x00;
+		for (; count < PadTo - 1; ++count)
 			*p++ = (PadValue | 0x80);
 		*p++ = PadValue;
 	}

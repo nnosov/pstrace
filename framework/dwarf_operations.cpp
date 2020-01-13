@@ -6,12 +6,53 @@
  */
 
 #include <dwarf.h>
+#include <inttypes.h>
+
 #include "dwarf_operations.h"
 #include "common.h"
 
+dwarf_reg_map	reg_map[] = {
+	// GP Registers
+	{0x0,  "RAX", "DW_OP_reg0"},
+	{0x1,  "RDX", "DW_OP_reg1"},
+	{0x2,  "RCX", "DW_OP_reg2"},
+	{0x3,  "RBX", "DW_OP_reg3"},
+	{0x4,  "RSI", "DW_OP_reg4"},
+	{0x5,  "RDI", "DW_OP_reg5"},
+	{0x6,  "RBP", "DW_OP_reg6"},
+	{0x7,  "RSP", "DW_OP_reg7"},
+	// Extended GP Registers
+	{0x8,  "R8",  "DW_OP_reg8"},
+	{0x9,  "R9",  "DW_OP_reg9"},
+	{0xA,  "R10", "DW_OP_reg10"},
+	{0xB,  "R11", "DW_OP_reg11"},
+	{0xC,  "R12", "DW_OP_reg12"},
+	{0xD,  "R13", "DW_OP_reg13"},
+	{0xE,  "R14", "DW_OP_reg14"},
+	{0xF,  "R15", "DW_OP_reg15"},
+	{0x10, "RIP", "DW_OP_reg16"}, // Return Address (RA) mapped to RIP
+	// SSE Vector Registers
+	{0x11, "XMM0", "DW_OP_reg17"},
+	{0x12, "XMM1", "DW_OP_reg18"},
+	{0x13, "XMM2", "DW_OP_reg19"},
+	{0x14, "XMM3", "DW_OP_reg20"},
+	{0x15, "XMM4", "DW_OP_reg21"},
+	{0x16, "XMM5", "DW_OP_reg22"},
+	{0x17, "XMM6", "DW_OP_reg23"},
+	{0x18, "XMM7", "DW_OP_reg24"},
+	{0x19, "XMM8", "DW_OP_reg25"},
+	{0x1a, "XMM9", "DW_OP_reg26"},
+	{0x1b, "XMM10", "DW_OP_reg27"},
+	{0x1c, "XMM11", "DW_OP_reg28"},
+	{0x1d, "XMM12", "DW_OP_reg29"},
+	{0x1e, "XMM13", "DW_OP_reg30"},
+	{0x1f, "XMM14", "DW_OP_reg31"},
+};
+
+// not implemented operations
 bool dw_op_notimpl(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	ctx->log(SEVERITY_ERROR, "0x%lX => %s(0x%lX, 0x%lX) operation is not implemented", map->op_num, map->op_name, op1, op2);
+	ctx->log(SEVERITY_ERROR, "%s(0x%lX, 0x%lX) operation is not implemented", map->op_name, op1, op2);
 	return false;
 }
 
@@ -19,7 +60,7 @@ bool dw_op_addr(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 {
 	// The DW_OP_addr operation has a single operand that encodes a machine
 	// address and whose size is the size of an address on the target machine.
-	ctx->stack.push(&op1, sizeof(op1), DWARF_TYPE_ADDRESS);
+	ctx->stack.push(&op1, sizeof(op1), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
 	return true;
 }
 
@@ -42,25 +83,31 @@ bool dw_op_deref(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 bool dw_op_const_x_u(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
 	// DW_OP_const1u, DW_OP_const2u, DW_OP_const4u, DW_OP_const8u. The single operand of a DW_OP_const<n>u operation provides a 1, 2, 4, or  8-byte unsigned integer constant, respectively.
+	// These operations push a value with the generic type
 	uint8_t size = 0;
+	dwarf_value_type type = DWARF_TYPE_UNSIGNED;
 	switch (map->op_num) {
 		case DW_OP_const1u:
 			size = 1;
+			type = DWARF_TYPE_CHAR;
 			break;
 		case DW_OP_const2u:
 			size = 2;
+			type = DWARF_TYPE_SHORT;
 			break;
 		case DW_OP_const4u:
 			size = 4;
+			type = DWARF_TYPE_INT;
 			break;
 		case DW_OP_const8u:
-			size = 1;
+			size = 8;
+			type = DWARF_TYPE_LONG;
 			break;
 		default:
 			return false;
 	}
 
-	ctx->stack.push(&op1, size, DWARF_TYPE_UNSIGNED);
+	ctx->stack.push(&op1, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -68,25 +115,35 @@ bool dw_op_const_x_u(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, 
 bool dw_op_const_x_s(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
 	// DW_OP_const1s, DW_OP_const2s, DW_OP_const4s, DW_OP_const8s. The single operand of a DW_OP_const<n>s operation provides a 1, 2, 4, or 8-byte signed integer constant, respectively.
-	uint8_t size = 0;
+	// These operations push a value with the generic type
+	uint8_t size; int64_t v;
+	dwarf_value_type type = DWARF_TYPE_SIGNED;
 	switch (map->op_num) {
-		case DW_OP_const1u:
-			size = 1;
+		case DW_OP_const1s:
+			*((int8_t*)(&v)) = (int8_t)op1;
+			size = sizeof(int8_t);
+			type = DWARF_TYPE_CHAR;
 			break;
-		case DW_OP_const2u:
-			size = 2;
+		case DW_OP_const2s:
+			*((int16_t*)(&v)) = (int16_t)op1;
+			size = sizeof(int16_t);
+			type = DWARF_TYPE_SHORT;
 			break;
-		case DW_OP_const4u:
-			size = 4;
+		case DW_OP_const4s:
+			*((int32_t*)(&v)) = (int32_t)op1;
+			size = sizeof(int32_t);
+			type = DWARF_TYPE_INT;
 			break;
-		case DW_OP_const8u:
-			size = 1;
+		case DW_OP_const8s:
+			v = (int64_t)op1;
+			size = sizeof(int64_t);
+			type = DWARF_TYPE_LONG;
 			break;
 		default:
 			return false;
 	}
 
-	ctx->stack.push(&op1, size, DWARF_TYPE_SIGNED);
+	ctx->stack.push(&op1, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -95,7 +152,7 @@ bool dw_op_constu(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 {
 	// The single operand of the DW_OP_constu operation provides an unsigned LEB128 integer constant.
 	uint64_t value = decode_uleb128((unsigned char*)&op1);
-	ctx->stack.push(&value, sizeof(value), DWARF_TYPE_UNSIGNED);
+	ctx->stack.push(&value, sizeof(value), DWARF_TYPE_LONG | DWARF_TYPE_UNSIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 	return true;
 }
 
@@ -103,7 +160,7 @@ bool dw_op_consts(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 {
 	// The single operand of the DW_OP_consts operation provides a signed LEB128 integer constant.
 	uint64_t value = decode_sleb128((unsigned char*)&op1);
-	ctx->stack.push(&value, sizeof(value), DWARF_TYPE_SIGNED);
+	ctx->stack.push(&value, sizeof(value),  DWARF_TYPE_LONG | DWARF_TYPE_SIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 	return true;
 }
 
@@ -163,6 +220,13 @@ bool dw_op_swap(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 		return true;
 	}
 
+	if(value1) {
+	    free(value1);
+	}
+	if(value2) {
+	    free(value2);
+	}
+
 	return false;
 }
 
@@ -183,6 +247,16 @@ bool dw_op_rot(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 		return true;
 	}
 
+    if(value1) {
+        free(value1);
+    }
+    if(value2) {
+        free(value2);
+    }
+    if(value3) {
+        free(value3);
+    }
+
 	return false;
 }
 
@@ -193,13 +267,13 @@ bool dw_op_abs(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 
 	dwarf_value* value = ctx->stack.get();
 	if(value) {
-		uint64_t v;
+		int64_t v;
 		if(!value->get_int(v)) {
 			ctx->log(SEVERITY_ERROR, "Wrong %d size of stack value", value->size);
 			return false;
 		}
-
-		value->replace(&v, value->size, DWARF_TYPE_SIGNED);
+		uint64_t res = llabs(v);
+		value->replace(&res, value->size, DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC | DWARF_TYPE_LONG);
 	}
 
 	return false;
@@ -209,25 +283,26 @@ bool dw_op_and(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 {
 	// The DW_OP_and operation pops the top two stack values, performs a bitwise and operation on the two, and pushes the result.
 
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
+	dwarf_value* value1 = ctx->stack.get(0);
+	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
-		if(value1->type != value2->type) {
-			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
+		if(!(value1->type & value2->type)) {
+			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%0x%X, %0x%X)", map->op_name, value1->type, value2->type);
 			return false;
 		}
 		uint64_t v1 = 0, v2 = 0;
-		if(!value1->get_uint(v1)) {
+		if(!value1->get_generic(v1)) {
 			ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
 			return false;
 		}
 
-		if(!value2->get_uint(v2)) {
+		if(!value2->get_generic(v2)) {
 			ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
 			return false;
 		}
 		uint64_t res = v1 & v2;
-		ctx->stack.push(&res, value1->size, value1->type);
+		ctx->stack.pop(); ctx->stack.pop();
+		ctx->stack.push(&res, value1->size, DWARF_TYPE_GENERIC);
 		return true;
 	}
 
@@ -238,27 +313,85 @@ bool dw_op_div(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 {
 	// The DW_OP_div operation pops the top two stack values, divides the former second entry by the former top of the stack using signed division, and pushes the result.
 
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
+	dwarf_value* value1 = ctx->stack.get(0);
+	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
-		if(value1->type != value2->type) {
-			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
-			return false;
-		}
-		int64_t v1 = 0, v2 = 0;
-		if(!value1->get_int(v1)) {
-			ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+		if(!(value1->type & value2->type)) {
+			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%0x%X, %0x%X)", map->op_name, value1->type, value2->type);
 			return false;
 		}
 
-		if(!value2->get_int(v2)) {
-			ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
-			return false;
+		if(value2->type & DWARF_TYPE_SIGNED) {
+		    int64_t sig2;
+		    if(!value2->get_int(sig2)) {
+		        ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
+		        return false;
+		    }
+		    if(value1->type & DWARF_TYPE_SIGNED) {
+		        int64_t sig1;
+		        if(!value1->get_int(sig1)) {
+		            ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+		            return false;
+		        }
+		        if(sig1 == 0) {
+		            ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, sig1, sig2);
+		            return false;
+		        }
+		        uint64_t res = sig2 / sig1;
+		        ctx->stack.pop(); ctx->stack.pop();
+		        ctx->stack.push(&res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+		        return true;
+		    } else {
+                uint64_t unsig1;
+                if(!value1->get_uint(unsig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(unsig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, unsig1, sig2);
+                    return false;
+                }
+                int64_t res = sig2 / unsig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                return true;
+		    }
+		} else {
+            uint64_t unsig2;
+            if(!value2->get_uint(unsig2)) {
+                ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
+                return false;
+            }
+            if(value1->type & DWARF_TYPE_SIGNED) {
+                int64_t sig1;
+                if(!value1->get_int(sig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(sig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, sig1, sig1);
+                    return false;
+                }
+                int64_t res = unsig2 / sig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                return true;
+            } else {
+                uint64_t unsig1;
+                if(!value1->get_uint(unsig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(unsig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, unsig1, unsig2);
+                    return false;
+                }
+                uint64_t res = unsig2 / unsig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+                return true;
+            }
 		}
-
-		int64_t res = v2 / v1;
-		ctx->stack.push(&res, value1->size, value1->type);
-		return true;
 	}
 
 	return false;
@@ -268,26 +401,32 @@ bool dw_op_minus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 {
 	// The DW_OP_minus operation pops the top two stack values, subtracts the former top of the stack from the former second entry, and pushes the result.
 
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
+	dwarf_value* value1 = ctx->stack.get(0);
+	dwarf_value* value2 = ctx->stack.get(1);
+	uint64_t unres; int64_t sigres; void* res;
 	if(value1 && value2) {
-		if(value1->type != value2->type) {
+		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
 			return false;
 		}
-		int64_t v1 = 0, v2 = 0;
-		if(!value1->get_int(v1)) {
-			ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
-			return false;
+		// use arithmetic by modulo 1 plus
+		uint64_t unsig1; uint64_t unsig2;
+		if(!value1->get_uint(unsig1)) {
+		    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+		    return false;
 		}
-
-		if(!value2->get_int(v2)) {
-			ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
-			return false;
+        if(!value2->get_uint(unsig2)) {
+            ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value2->size);
+            return false;
+        }
+		int res_type = DWARF_TYPE_GENERIC;
+		if(value2->type & DWARF_TYPE_MEMORY_LOC) {
+		    res_type |= DWARF_TYPE_MEMORY_LOC;
 		}
+		uint64_t res = unsig2 - unsig1;
+		ctx->stack.pop(); ctx->stack.pop();
+		ctx->stack.push(&res, sizeof(res), res_type);
 
-		int64_t res = v2 - v1;
-		ctx->stack.push(&res, value1->size, value1->type);
 		return true;
 	}
 
@@ -298,26 +437,32 @@ bool dw_op_mod(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 {
 	// The DW_OP_mod operation pops the top two stack values and pushes the result of the calculation: former second stack entry modulo the former top of the stack.
 
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
+	dwarf_value* value1 = ctx->stack.get(0);
+	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
-		if(value1->type != value2->type) {
+		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
 			return false;
 		}
-		int64_t v1 = 0, v2 = 0;
-		if(!value1->get_int(v1)) {
+		uint64_t v1 = 0, v2 = 0;
+		if(!value1->get_uint(v1)) {
 			ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
 			return false;
 		}
 
-		if(!value2->get_int(v2)) {
+		if(v1 == 0) {
+		    ctx->log(SEVERITY_ERROR, "Division by zero requested, aborting.");
+		    return false;
+		}
+
+		if(!value2->get_uint(v2)) {
 			ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
 			return false;
 		}
 
-		int64_t res = v2 % v1;
-		ctx->stack.push(&res, value1->size, value1->type);
+		uint64_t res = v2 % v1;
+		ctx->stack.pop(); ctx->stack.pop();
+		ctx->stack.push(&res, value1->size, DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
 		return true;
 	}
 
@@ -328,30 +473,88 @@ bool dw_op_mul(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 {
 	// The DW_OP_mul operation pops the top two stack entries, multiplies them together, and pushes the result.
 
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
-	if(value1 && value2) {
-		if(value1->type != value2->type) {
-			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
-			return false;
-		}
-		int64_t v1 = 0, v2 = 0;
-		if(!value1->get_int(v1)) {
-			ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
-			return false;
-		}
+    dwarf_value* value1 = ctx->stack.get(0);
+    dwarf_value* value2 = ctx->stack.get(1);
+    if(value1 && value2) {
+        if(!(value1->type & value2->type)) {
+            ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%0x%X, %0x%X)", map->op_name, value1->type, value2->type);
+            return false;
+        }
 
-		if(!value2->get_int(v2)) {
-			ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
-			return false;
-		}
+        if(value2->type & DWARF_TYPE_SIGNED) {
+            int64_t sig2;
+            if(!value2->get_int(sig2)) {
+                ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
+                return false;
+            }
+            if(value1->type & DWARF_TYPE_SIGNED) {
+                int64_t sig1;
+                if(!value1->get_int(sig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(sig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, sig1, sig2);
+                    return false;
+                }
+                uint64_t res = sig2 * sig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+                return true;
+            } else {
+                uint64_t unsig1;
+                if(!value1->get_uint(unsig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(unsig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, unsig1, sig2);
+                    return false;
+                }
+                int64_t res = sig2 * unsig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                return true;
+            }
+        } else {
+            uint64_t unsig2;
+            if(!value2->get_uint(unsig2)) {
+                ctx->log(SEVERITY_ERROR, "Wrong size of 2nd stack value for operation %s(%d)", map->op_name, value1->size);
+                return false;
+            }
+            if(value1->type & DWARF_TYPE_SIGNED) {
+                int64_t sig1;
+                if(!value1->get_int(sig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(sig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, sig1, sig1);
+                    return false;
+                }
+                int64_t res = unsig2 * sig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                return true;
+            } else {
+                uint64_t unsig1;
+                if(!value1->get_uint(unsig1)) {
+                    ctx->log(SEVERITY_ERROR, "Wrong size of 1st stack value for operation %s(%d)", map->op_name, value1->size);
+                    return false;
+                }
+                if(unsig1 == 0) {
+                    ctx->log(SEVERITY_ERROR, "Division by zero for operation %s(0x%lX, 0x%lX)", map->op_name, unsig1, unsig2);
+                    return false;
+                }
+                uint64_t res = unsig2 * unsig1;
+                ctx->stack.pop(); ctx->stack.pop();
+                ctx->stack.push(&res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+                return true;
+            }
+        }
+    }
 
-		int64_t res = v2 * v1;
-		ctx->stack.push(&res, value1->size, value1->type);
-		return true;
-	}
-
-	return false;
+    return false;
 }
 
 bool dw_op_neg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
@@ -402,8 +605,8 @@ bool dw_op_neg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 
 bool dw_op_not(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_neg operation pops the top stack entry, interprets it as a signed value and pushes its negation.
-	// If the negation cannot be represented, the result is undefined.
+	// The DW_OP_not operation pops the top stack entry, and pushes its bitwise complement.
+
 
 	dwarf_value* value = ctx->stack.get();
 	if(value) {
@@ -412,7 +615,7 @@ bool dw_op_not(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 			ctx->log(SEVERITY_ERROR, "Wrong size of stack value for operation %s(%d)", map->op_name, value->size);
 			return false;
 		}
-		v = !v;
+		v = ~v;
 
 		value->replace(&v, value->size, value->type);
 
@@ -429,7 +632,7 @@ bool dw_op_or(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_W
 	dwarf_value* value1 = ctx->stack.pop();
 	dwarf_value* value2 = ctx->stack.pop();
 	if(value1 && value2) {
-		if(value1->type != value2->type) {
+		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
 			return false;
 		}
@@ -459,7 +662,7 @@ bool dw_op_plus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 	dwarf_value* value1 = ctx->stack.pop();
 	dwarf_value* value2 = ctx->stack.pop();
 	if(value1 && value2) {
-		if(value1->type != value2->type) {
+		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
 			return false;
 		}
@@ -521,137 +724,252 @@ bool dw_op_plus_uconst(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1
 	return false;
 }
 
+// Register location descriptions. From DWARF 5, section 2.6.1.1.3:
+// Register location descriptions describe an object (or a piece of an object) that resides in a register.
+// A register location description must stand alone as the entire description of an object or a piece of an object.
+bool dw_op_reg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+	// The DW_OP_regx operation has a single unsigned LEB128 literal operand that encodes the name of a register
+	if(map->op_num != DW_OP_regx && (map->op_num < DW_OP_reg0 || map->op_num > DW_OP_reg31)) {
+		return false;
+	}
+
+	uint64_t regno = 0;
+	if(map->op_num == DW_OP_regx) {
+		regno = decode_uleb128((unsigned char*)&op1);
+	} else {
+		regno = map->op_num - DW_OP_reg0;
+	}
+
+	ctx->stack.push(&regno, sizeof(regno), DWARF_TYPE_REGISTER_LOC);
+
+	return true;
+}
+
+// Register values. DWARF5, section 2.5.1.2
+// Register values are used to describe an object (or a piece of an object) that is located in memory at an address that is contained in
+// a register (possibly offset by some constant)
+bool dw_op_breg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+	// The DW_OP_bregx operation provides the sum of two values specified by its two operands.
+	// The first operand is a register number which is specified by an unsigned LEB128 number. The second operand is a signed LEB128 offset.
+	if(map->op_num != DW_OP_bregx && (map->op_num < DW_OP_breg0 || map->op_num > DW_OP_breg31)) {
+		return false;
+	}
+
+	uint64_t regno = 0; int64_t off = 0;
+	if(map->op_num == DW_OP_bregx) {
+		regno = decode_uleb128((unsigned char*)&op1);
+		off = decode_sleb128((unsigned char*)&op2);
+	} else {
+		regno = map->op_num - DW_OP_breg0;
+		off = decode_sleb128((unsigned char*)&op1);
+	}
+
+	unw_word_t val = 0;
+	if(unw_get_reg(&ctx->cursor, regno, &val)) {
+		return false;
+	}
+
+	val += off;
+	ctx->stack.push(&val, sizeof(val), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+
+	return true;
+}
+
+bool dw_op_lit_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+	// The DW_OP_lit<n> operations encode the unsigned literal values from 0 through 31, inclusive.
+	// Operations other than DW_OP_const_type push a value with the generic type.
+	if(map->op_num < DW_OP_lit0 || map->op_num > DW_OP_lit31) {
+		return false;
+	}
+
+	uint64_t val = map->op_num - DW_OP_lit0;
+	ctx->stack.push(&val, sizeof(val), DWARF_TYPE_GENERIC);
+
+	return true;
+}
+
+bool dw_op_stack_value(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+    // DWARF5, Section 2.6.1.1.4:
+    // The DW_OP_stack_value operation specifies that the object does not exist in memory but its value is nonetheless known and is at the top of the DWARF
+    // expression stack. In this form of location description, the DWARF expression represents the actual value of the object, rather than its location.
+    // The DW_OP_stack_value operation terminates the expression.
+
+    dwarf_value* v = ctx->stack.get();
+    if(v) {
+        v->type  = DWARF_TYPE_GENERIC;
+        return true;
+    }
+
+    return false;
+}
+
 dwarf_op_map dw_op[] = {
-		{DW_OP_addr, -1,   0, "DW_OP_addr", dw_op_addr},
-		{DW_OP_deref, -1,  0, "DW_OP_deref", dw_op_deref},
+		{DW_OP_addr, 		"DW_OP_addr", 		dw_op_addr},
+		{DW_OP_deref, 		"DW_OP_deref", 		dw_op_deref},
 		// Constant operations
-		{DW_OP_const1u, -1, 0, "DW_OP_const1u", dw_op_const_x_u},
-		{DW_OP_const1s, -1, 0, "DW_OP_const1s", dw_op_const_x_s},
-		{DW_OP_const2u, -1, 0, "DW_OP_const2u", dw_op_const_x_u},
-		{DW_OP_const2s, -1, 0, "DW_OP_const2s", dw_op_const_x_s},
-		{DW_OP_const4u, -1, 0, "DW_OP_const4u", dw_op_const_x_u},
-		{DW_OP_const4s, -1, 0, "DW_OP_const4s", dw_op_const_x_s},
-		{DW_OP_const8u, -1, 0, "DW_OP_const8u", dw_op_const_x_u},
-		{DW_OP_const8s, -1, 0, "DW_OP_const8s", dw_op_const_x_s},
-		{DW_OP_constu,  -1, 0, "DW_OP_constu",  dw_op_constu},
-		{DW_OP_consts,  -1, 0, "DW_OP_consts",  dw_op_consts},
+		{DW_OP_const1u, 	"DW_OP_const1u", 	dw_op_const_x_u},
+		{DW_OP_const1s, 	"DW_OP_const1s", 	dw_op_const_x_s},
+		{DW_OP_const2u, 	"DW_OP_const2u", 	dw_op_const_x_u},
+		{DW_OP_const2s, 	"DW_OP_const2s", 	dw_op_const_x_s},
+		{DW_OP_const4u, 	"DW_OP_const4u", 	dw_op_const_x_u},
+		{DW_OP_const4s, 	"DW_OP_const4s", 	dw_op_const_x_s},
+		{DW_OP_const8u, 	"DW_OP_const8u", 	dw_op_const_x_u},
+		{DW_OP_const8s, 	"DW_OP_const8s", 	dw_op_const_x_s},
+		{DW_OP_constu,  	"DW_OP_constu",  	dw_op_constu},
+		{DW_OP_consts,  	"DW_OP_consts",  	dw_op_consts},
 		// DWARF expression stack operations
-		{DW_OP_dup,     -1, 0, "DW_OP_dup",     dw_op_dup},
-		{DW_OP_drop,    -1, 0, "DW_OP_drop",    dw_op_drop},
-		{DW_OP_over,    -1, 0, "DW_OP_over",    dw_op_over},
-		{DW_OP_pick,	-1, 0, "DW_OP_pick",	dw_op_pick},
-		{DW_OP_swap,	-1, 0, "DW_OP_swap",	dw_op_swap},
-		{DW_OP_rot,		-1, 0, "DW_OP_rot",		dw_op_rot},
-		{DW_OP_xderef, 	-1, 0, "DW_OP_xderef",	dw_op_notimpl},
+		{DW_OP_dup,     	"DW_OP_dup",     	dw_op_dup},
+		{DW_OP_drop,    	"DW_OP_drop",    	dw_op_drop},
+		{DW_OP_over,    	"DW_OP_over",    	dw_op_over},
+		{DW_OP_pick,		"DW_OP_pick",		dw_op_pick},
+		{DW_OP_swap,		"DW_OP_swap",		dw_op_swap},
+		{DW_OP_rot,			"DW_OP_rot",		dw_op_rot},
+		{DW_OP_xderef, 		"DW_OP_xderef",		dw_op_notimpl},
 		// Arithmetic and Logical Operations
-		{DW_OP_abs,		-1,	0, "DW_OP_abs",		dw_op_abs},
-		{DW_OP_and, 	-1, 0, "DW_OP_and",		dw_op_and},
-		{DW_OP_div,		-1, 0, "DW_OP_div",		dw_op_div},
-		{DW_OP_minus,	-1, 0, "DW_OP_minus",	dw_op_minus},
-		{DW_OP_mod,		-1, 0, "DW_OP_mod",		dw_op_mod},
-		{DW_OP_mul,		-1, 0, "DW_OP_mul",		dw_op_mul},
-		{DW_OP_neg, 	-1, 0, "DW_OP_neg",		dw_op_neg},
-		{DW_OP_not,		-1, 0, "DW_OP_not", 	dw_op_not},
-		{DW_OP_or,		-1, 0, "DW_OP_or",		dw_op_or},
-		{DW_OP_plus,	-1, 0, "DW_OP_plus",	dw_op_plus},
-		{DW_OP_plus_uconst, 0x0,  0, "DW_OP_plus_uconst", dw_op_plus_uconst},
-		// Register location descriptions. From DWARF 5, section 2.6.1.1.3:
-		// Register location descriptions describe an object (or a piece of an object) that resides in a register.
-		// A register location description must stand alone as the entire description of an object or a piece of an object.
-
+		{DW_OP_abs,			"DW_OP_abs",		dw_op_abs},
+		{DW_OP_and, 		"DW_OP_and",		dw_op_and},
+		{DW_OP_div,			"DW_OP_div",		dw_op_div},
+		{DW_OP_minus,		"DW_OP_minus",		dw_op_minus},
+		{DW_OP_mod,			"DW_OP_mod",		dw_op_mod},
+		{DW_OP_mul,			"DW_OP_mul",		dw_op_mul},
+		{DW_OP_neg, 		"DW_OP_neg",		dw_op_neg},
+		{DW_OP_not,			"DW_OP_not", 		dw_op_not},
+		{DW_OP_or,			"DW_OP_or",			dw_op_or},
+		{DW_OP_plus,		"DW_OP_plus",		dw_op_plus},
+		{DW_OP_plus_uconst, "DW_OP_plus_uconst",dw_op_plus_uconst},
+		// not implemented for now
+		{DW_OP_shl,			"DW_OP_shl",		dw_op_notimpl},
+		{DW_OP_shr,			"DW_OP_shr", 		dw_op_notimpl},
+		{DW_OP_shra,		"DW_OP_shra",		dw_op_notimpl},
+		{DW_OP_xor,			"DW_OP_xor",		dw_op_notimpl},
+		{DW_OP_bra,			"DW_OP_bra",		dw_op_notimpl},
+		{DW_OP_eq,			"DW_OP_eq",			dw_op_notimpl},
+		{DW_OP_ge,			"DW_OP_ge",			dw_op_notimpl},
+		{DW_OP_gt, 			"DW_OP_gt",			dw_op_notimpl},
+		{DW_OP_le,			"DW_OP_le",			dw_op_notimpl},
+		{DW_OP_lt,			"DW_OP_lt",			dw_op_notimpl},
+		{DW_OP_ne,			"DW_OP_ne",			dw_op_notimpl},
+		{DW_OP_skip,		"DW_OP_skip",		dw_op_notimpl},
+		//DWARF5 2.5.1.1 Literal Encodings
+		{DW_OP_lit0,		"DW_OP_lit0",		dw_op_lit_x},
+		{DW_OP_lit1,		"DW_OP_lit1",		dw_op_lit_x},
+		{DW_OP_lit2,		"DW_OP_lit2",		dw_op_lit_x},
+		{DW_OP_lit3,		"DW_OP_lit3",		dw_op_lit_x},
+		{DW_OP_lit4,		"DW_OP_lit4",		dw_op_lit_x},
+		{DW_OP_lit5,		"DW_OP_lit5",		dw_op_lit_x},
+		{DW_OP_lit6,		"DW_OP_lit6",		dw_op_lit_x},
+		{DW_OP_lit7,		"DW_OP_lit7",		dw_op_lit_x},
+		{DW_OP_lit8,		"DW_OP_lit8",		dw_op_lit_x},
+		{DW_OP_lit9,		"DW_OP_lit9",		dw_op_lit_x},
+		{DW_OP_lit10,		"DW_OP_lit10",		dw_op_lit_x},
+		{DW_OP_lit11,		"DW_OP_lit11",		dw_op_lit_x},
+		{DW_OP_lit12,		"DW_OP_lit12",		dw_op_lit_x},
+		{DW_OP_lit13,		"DW_OP_lit13",		dw_op_lit_x},
+		{DW_OP_lit14,		"DW_OP_lit14",		dw_op_lit_x},
+		{DW_OP_lit15,		"DW_OP_lit15",		dw_op_lit_x},
+		{DW_OP_lit16,		"DW_OP_lit16",		dw_op_lit_x},
+		{DW_OP_lit17,		"DW_OP_lit17",		dw_op_lit_x},
+		{DW_OP_lit18,		"DW_OP_lit18",		dw_op_lit_x},
+		{DW_OP_lit19,		"DW_OP_lit19",		dw_op_lit_x},
+		{DW_OP_lit20,		"DW_OP_lit20",		dw_op_lit_x},
+		{DW_OP_lit21,		"DW_OP_lit21",		dw_op_lit_x},
+		{DW_OP_lit22,		"DW_OP_lit22",		dw_op_lit_x},
+		{DW_OP_lit23,		"DW_OP_lit23",		dw_op_lit_x},
+		{DW_OP_lit24,		"DW_OP_lit24",		dw_op_lit_x},
+		{DW_OP_lit25,		"DW_OP_lit25",		dw_op_lit_x},
+		{DW_OP_lit26,		"DW_OP_lit26",		dw_op_lit_x},
+		{DW_OP_lit27,		"DW_OP_lit27",		dw_op_lit_x},
+		{DW_OP_lit28,		"DW_OP_lit28",		dw_op_lit_x},
+		{DW_OP_lit29,		"DW_OP_lit29",		dw_op_lit_x},
+		{DW_OP_lit30,		"DW_OP_lit30",		dw_op_lit_x},
+		{DW_OP_lit31,		"DW_OP_lit31",		dw_op_lit_x},
+		// Register location descriptions.
 		// GP Registers
-		{0x50, 0x0,  "RAX", "DW_OP_reg0"},
-		{0x51, 0x1,  "RDX", "DW_OP_reg1"},
-		{0x52, 0x2,  "RCX", "DW_OP_reg2"},
-		{0x53, 0x3,  "RBX", "DW_OP_reg3"},
-		{0x54, 0x4,  "RSI", "DW_OP_reg4"},
-		{0x55, 0x5,  "RDI", "DW_OP_reg5"},
-		{0x56, 0x6,  "RBP", "DW_OP_reg6"},
-		{0x57, 0x7,  "RSP", "DW_OP_reg7"},
+		{DW_OP_reg0, 		"DW_OP_reg0",		dw_op_reg_x},
+		{DW_OP_reg1, 		"DW_OP_reg1",		dw_op_reg_x},
+		{DW_OP_reg2, 		"DW_OP_reg2",		dw_op_reg_x},
+		{DW_OP_reg3, 		"DW_OP_reg3",		dw_op_reg_x},
+		{DW_OP_reg4, 		"DW_OP_reg4",		dw_op_reg_x},
+		{DW_OP_reg5, 		"DW_OP_reg5",		dw_op_reg_x},
+		{DW_OP_reg6, 		"DW_OP_reg6",		dw_op_reg_x},
+		{DW_OP_reg7, 		"DW_OP_reg7",		dw_op_reg_x},
 		// Extended GP Registers
-		{0x58, 0x8,  "R8",  "DW_OP_reg8"},
-		{0x59, 0x9,  "R9",  "DW_OP_reg9"},
-		{0x5A, 0xA,  "R10", "DW_OP_reg10"},
-		{0x5B, 0xB,  "R11", "DW_OP_reg11"},
-		{0x5C, 0xC,  "R12", "DW_OP_reg12"},
-		{0x5D, 0xD,  "R13", "DW_OP_reg13"},
-		{0x5E, 0xE,  "R14", "DW_OP_reg14"},
-		{0x5F, 0xF,  "R15", "DW_OP_reg15"},
-		{0x60, 0x10, "RIP", "DW_OP_reg16"}, // Return Address (RA) mapped to RIP
+		{DW_OP_reg8, 		"DW_OP_reg8",		dw_op_reg_x},
+		{DW_OP_reg9, 		"DW_OP_reg9",		dw_op_reg_x},
+		{DW_OP_reg10, 		"DW_OP_reg10",		dw_op_reg_x},
+		{DW_OP_reg11, 		"DW_OP_reg11",		dw_op_reg_x},
+		{DW_OP_reg12, 		"DW_OP_reg12",		dw_op_reg_x},
+		{DW_OP_reg13, 		"DW_OP_reg13",		dw_op_reg_x},
+		{DW_OP_reg14, 		"DW_OP_reg14",		dw_op_reg_x},
+		{DW_OP_reg15, 		"DW_OP_reg15",		dw_op_reg_x},
+		{DW_OP_reg16, 		"DW_OP_reg16",		dw_op_reg_x}, // Return Address (RA) mapped to RIP
 		// SSE Vector Registers
-		{0x61, 0x11, "XMM0", "DW_OP_reg17"},
-		{0x62, 0x12, "XMM1", "DW_OP_reg18"},
-		{0x63, 0x13, "XMM2", "DW_OP_reg19"},
-		{0x64, 0x14, "XMM3", "DW_OP_reg20"},
-		{0x65, 0x15, "XMM4", "DW_OP_reg21"},
-		{0x66, 0x16, "XMM5", "DW_OP_reg22"},
-		{0x67, 0x17, "XMM6", "DW_OP_reg23"},
-		{0x68, 0x18, "XMM7", "DW_OP_reg24"},
-		{0x69, 0x19, "XMM8", "DW_OP_reg25"},
-		{0x6a, 0x1a, "XMM9", "DW_OP_reg26"},
-		{0x6b, 0x1b, "XMM10", "DW_OP_reg27"},
-		{0x6c, 0x1c, "XMM11", "DW_OP_reg28"},
-		{0x6d, 0x1d, "XMM12", "DW_OP_reg29"},
-		{0x6e, 0x1e, "XMM13", "DW_OP_reg30"},
-		{0x6f, 0x1f, "XMM14", "DW_OP_reg31"},
-
-		// Register values. DWARF5, section 2.5.1.2
-		// Register values are used to describe an object (or a piece of an object) that is located in memory at an address that is contained in
-		// a register (possibly offset by some constant)
-
+		{DW_OP_reg17, 		"DW_OP_reg17",		dw_op_reg_x},
+		{DW_OP_reg18, 		"DW_OP_reg18",		dw_op_reg_x},
+		{DW_OP_reg19, 		"DW_OP_reg19",		dw_op_reg_x},
+		{DW_OP_reg20, 		"DW_OP_reg20",		dw_op_reg_x},
+		{DW_OP_reg21, 		"DW_OP_reg21",		dw_op_reg_x},
+		{DW_OP_reg22, 		"DW_OP_reg22",		dw_op_reg_x},
+		{DW_OP_reg23, 		"DW_OP_reg23",		dw_op_reg_x},
+		{DW_OP_reg24, 		"DW_OP_reg24",		dw_op_reg_x},
+		{DW_OP_reg25, 		"DW_OP_reg25",		dw_op_reg_x},
+		{DW_OP_reg26, 		"DW_OP_reg26",		dw_op_reg_x},
+		{DW_OP_reg27, 		"DW_OP_reg27",		dw_op_reg_x},
+		{DW_OP_reg28, 		"DW_OP_reg28",		dw_op_reg_x},
+		{DW_OP_reg29, 		"DW_OP_reg29",		dw_op_reg_x},
+		{DW_OP_reg30, 		"DW_OP_reg30",		dw_op_reg_x},
+		{DW_OP_reg31, 		"DW_OP_reg31",		dw_op_reg_x},
+		// Register values.
 		// GP Registers
-		{0x70, 0x0,  "RAX", "DW_OP_breg0"},
-		{0x71, 0x1,  "RDX", "DW_OP_breg1"},
-		{0x72, 0x2,  "RCX", "DW_OP_breg2"},
-		{0x73, 0x3,  "RBX", "DW_OP_breg3"},
-		{0x74, 0x4,  "RSI", "DW_OP_breg4"},
-		{0x75, 0x5,  "RDI", "DW_OP_breg5"},
-		{0x76, 0x6,  "RBP", "DW_OP_breg6"},
-		{0x77, 0x7,  "RSP", "DW_OP_breg7"},
+		{DW_OP_breg0,		"DW_OP_breg0", 		dw_op_breg_x},
+		{DW_OP_breg1,		"DW_OP_breg1", 		dw_op_breg_x},
+		{DW_OP_breg2, 		"DW_OP_breg2", 		dw_op_breg_x},
+		{DW_OP_breg3, 		"DW_OP_breg3", 		dw_op_breg_x},
+		{DW_OP_breg4, 		"DW_OP_breg4", 		dw_op_breg_x},
+		{DW_OP_breg5, 		"DW_OP_breg5", 		dw_op_breg_x},
+		{DW_OP_breg6, 		"DW_OP_breg6", 		dw_op_breg_x},
+		{DW_OP_breg7, 		"DW_OP_breg7", 		dw_op_breg_x},
 		// Extended GP Registers
-		{0x78, 0x8,  "R8",  "DW_OP_breg8"},
-		{0x79, 0x9,  "R9",  "DW_OP_breg9"},
-		{0x7A, 0xA,  "R10", "DW_OP_breg10"},
-		{0x7B, 0xB,  "R11", "DW_OP_breg11"},
-		{0x7C, 0xC,  "R12", "DW_OP_breg12"},
-		{0x7D, 0xD,  "R13", "DW_OP_breg13"},
-		{0x7E, 0xE,  "R14", "DW_OP_breg14"},
-		{0x7F, 0xF,  "R15", "DW_OP_breg15"},
-		{0x80, 0x10, "RIP", "DW_OP_breg16"}, // Return Address (RA) mapped to RIP
+		{DW_OP_breg8, 		"DW_OP_breg8", 		dw_op_breg_x},
+		{DW_OP_breg9, 		"DW_OP_breg9", 		dw_op_breg_x},
+		{DW_OP_breg10, 		"DW_OP_breg10", 	dw_op_breg_x},
+		{DW_OP_breg11, 		"DW_OP_breg11", 	dw_op_breg_x},
+		{DW_OP_breg12, 		"DW_OP_breg12", 	dw_op_breg_x},
+		{DW_OP_breg13, 		"DW_OP_breg13", 	dw_op_breg_x},
+		{DW_OP_breg14, 		"DW_OP_breg14", 	dw_op_breg_x},
+		{DW_OP_breg15, 		"DW_OP_breg15", 	dw_op_breg_x},
+		{DW_OP_breg16, 		"DW_OP_breg16", 	dw_op_breg_x}, // Return Address (RA) mapped to RIP
 		// SSE Vector Registers
-		{0x81, 0x11, "XMM0", "DW_OP_breg17"},
-		{0x82, 0x12, "XMM1", "DW_OP_breg18"},
-		{0x83, 0x13, "XMM2", "DW_OP_breg19"},
-		{0x84, 0x14, "XMM3", "DW_OP_breg20"},
-		{0x85, 0x15, "XMM4", "DW_OP_breg21"},
-		{0x86, 0x16, "XMM5", "DW_OP_breg22"},
-		{0x87, 0x17, "XMM6", "DW_OP_breg23"},
-		{0x88, 0x18, "XMM7", "DW_OP_breg24"},
-		{0x89, 0x19, "XMM8", "DW_OP_breg25"},
-		{0x8a, 0x1a, "XMM9", "DW_OP_breg26"},
-		{0x8b, 0x1b, "XMM10", "DW_OP_breg27"},
-		{0x8c, 0x1c, "XMM11", "DW_OP_breg28"},
-		{0x8d, 0x1d, "XMM12", "DW_OP_breg29"},
-		{0x8e, 0x1e, "XMM13", "DW_OP_breg30"},
-		{0x8f, 0x1f, "XMM14", "DW_OP_breg31"},
+		{DW_OP_breg17, 		"DW_OP_breg17", 	dw_op_breg_x},
+		{DW_OP_breg18, 		"DW_OP_breg18", 	dw_op_breg_x},
+		{DW_OP_breg19, 		"DW_OP_breg19", 	dw_op_breg_x},
+		{DW_OP_breg20, 		"DW_OP_breg20", 	dw_op_breg_x},
+		{DW_OP_breg21, 		"DW_OP_breg21", 	dw_op_breg_x},
+		{DW_OP_breg22, 		"DW_OP_breg22", 	dw_op_breg_x},
+		{DW_OP_breg23, 		"DW_OP_breg23", 	dw_op_breg_x},
+		{DW_OP_breg24, 		"DW_OP_breg24", 	dw_op_breg_x},
+		{DW_OP_breg25, 		"DW_OP_breg25", 	dw_op_breg_x},
+		{DW_OP_breg26, 		"DW_OP_breg26", 	dw_op_breg_x},
+		{DW_OP_breg27, 		"DW_OP_breg27", 	dw_op_breg_x},
+		{DW_OP_breg28, 		"DW_OP_breg28", 	dw_op_breg_x},
+		{DW_OP_breg29, 		"DW_OP_breg29", 	dw_op_breg_x},
+		{DW_OP_breg30, 		"DW_OP_breg30", 	dw_op_breg_x},
+		{DW_OP_breg31, 		"DW_OP_breg31", 	dw_op_breg_x},
 
-		// The DW_OP_regx operation has a single unsigned LEB128 literal operand that encodes the name of a register
-		{0x90, -1,   0,     "DW_OP_regx"},
+		{DW_OP_regx, 		"DW_OP_regx",		dw_op_reg_x},
 		// The DW_OP_fbreg operation provides a signed LEB128 offset from the address specified by the location description in the DW_AT_frame_base
 		// attribute of the current function. This is typically a stack pointer register plus or minus some offset
-		{0x91, -1,   0,     "DW_OP_fbreg"},
-		// The DW_OP_bregx operation provides the sum of two values specified by its two operands.
-		// The first operand is a register number which is specified by an unsigned LEB128 number. The second operand is a signed LEB128 offset.
-		{0x92, -1,   0,     "DW_OP_bregx"},
-		{0x9C, -1,   0,     "DW_OP_call_frame_cfa"},
-		// DWARF5, Section 2.6.1.1.4:
-		// The DW_OP_stack_value operation specifies that the object does not exist in memory but its value is nonetheless known and is at the top of the DWARF
-		// expression stack. In this form of location description, the DWARF expression represents the actual value of the object, rather than its location.
-		// The DW_OP_stack_value operation terminates the expression.
-		{0x9F, -1,   0,     "DW_OP_stack_value"},
+		{DW_OP_fbreg, 		"DW_OP_fbreg", 		dw_op_notimpl},
+		{DW_OP_bregx,		"DW_OP_bregx", 		dw_op_breg_x},
+		{DW_OP_call_frame_cfa, "DW_OP_call_frame_cfa", dw_op_notimpl},
+		{DW_OP_stack_value, "DW_OP_stack_value", dw_op_stack_value},
 		// This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
 		// simple register or DWARF expression
-		{0xF3, -1,   0,     "DW_OP_GNU_entry_value"},
+		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value", dw_op_notimpl},
 };
 
 const dwarf_op_map* find_op_map(int op)
