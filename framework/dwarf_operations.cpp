@@ -546,11 +546,10 @@ bool dw_op_mul(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
     return false;
 }
 
+// The DW_OP_neg operation pops the top stack entry, interprets it as a signed value and pushes its negation.
+// If the negation cannot be represented, the result is undefined.
 bool dw_op_neg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_neg operation pops the top stack entry, interprets it as a signed value and pushes its negation.
-	// If the negation cannot be represented, the result is undefined.
-
 	dwarf_value* value = ctx->stack.get();
 	if(value) {
 		int64_t v = 0;
@@ -710,8 +709,7 @@ bool dw_op_plus_uconst(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1
 	return false;
 }
 
-// Register location descriptions. From DWARF 5, section 2.6.1.1.3:
-// Register location descriptions describe an object (or a piece of an object) that resides in a register.
+// Register location descriptions. Describe an object (or a piece of an object) that resides in a register.
 // A register location description must stand alone as the entire description of an object or a piece of an object.
 // The DW_OP_regx operation has a single unsigned LEB128 literal operand that encodes the name of a register
 bool dw_op_reg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
@@ -732,13 +730,11 @@ bool dw_op_reg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 	return true;
 }
 
-// Register values. DWARF5, section 2.5.1.2
-// Register values are used to describe an object (or a piece of an object) that is located in memory at an address that is contained in
-// a register (possibly offset by some constant)
+// DWARF5, section 2.5.1.2  Register values are used to describe an object (or a piece of an object) that is located in memory at an address that is contained in a register (possibly offset by some constant)
+// The DW_OP_bregx operation provides the sum of two values specified by its two operands.
+// The first operand is a register number which is specified by an unsigned LEB128 number. The second operand is a signed LEB128 offset.
 bool dw_op_breg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_bregx operation provides the sum of two values specified by its two operands.
-	// The first operand is a register number which is specified by an unsigned LEB128 number. The second operand is a signed LEB128 offset.
 	if(map->op_num != DW_OP_bregx && (map->op_num < DW_OP_breg0 || map->op_num > DW_OP_breg31)) {
 		return false;
 	}
@@ -763,10 +759,10 @@ bool dw_op_breg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 	return true;
 }
 
+// The DW_OP_lit<n> operations encode the unsigned literal values from 0 through 31, inclusive.
+// Operations other than DW_OP_const_type push a value with the generic type.
 bool dw_op_lit_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_lit<n> operations encode the unsigned literal values from 0 through 31, inclusive.
-	// Operations other than DW_OP_const_type push a value with the generic type.
 	if(map->op_num < DW_OP_lit0 || map->op_num > DW_OP_lit31) {
 		return false;
 	}
@@ -777,12 +773,11 @@ bool dw_op_lit_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 	return true;
 }
 
+// The DW_OP_stack_value operation specifies that the object does not exist in memory but its value is nonetheless known and is at the top of the DWARF
+// expression stack. In this form of location description, the DWARF expression represents the actual value of the object, rather than its location.
+// The DW_OP_stack_value operation terminates the expression.
 bool dw_op_stack_value(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    // DWARF5, Section 2.6.1.1.4:
-    // The DW_OP_stack_value operation specifies that the object does not exist in memory but its value is nonetheless known and is at the top of the DWARF
-    // expression stack. In this form of location description, the DWARF expression represents the actual value of the object, rather than its location.
-    // The DW_OP_stack_value operation terminates the expression.
 
     dwarf_value* v = ctx->stack.get();
     if(v) {
@@ -793,15 +788,10 @@ bool dw_op_stack_value(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1
     return false;
 }
 
+// The DW_OP_call_frame_cfa operation pushes the value of the CFA, obtained from the Call Frame Information (see Section 6.4 on page 171).
 bool dw_op_call_frame_cfa(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    // DWARF5, Section 2.6.1.1.4:
-    // The DW_OP_stack_value operation specifies that the object does not exist in memory but its value is nonetheless known and is at the top of the DWARF
-    // expression stack. In this form of location description, the DWARF expression represents the actual value of the object, rather than its location.
-    // The DW_OP_stack_value operation terminates the expression.
-
     // since in signal handler we are know SP value, just push it to DWARF stack
-
     unw_word_t sp;
     if(unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp)) {
         return false;
@@ -812,12 +802,11 @@ bool dw_op_call_frame_cfa(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word 
     return true;
 }
 
+// The DW_OP_fbreg operation provides a signed LEB128 offset from the address specified by the location description in the DW_AT_frame_base
+// attribute of the current function. This is typically a stack pointer register plus or minus some offset
+// since in signal handler we are know SP value, just use it as DW_AT_frame_base
 bool dw_op_fbreg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    // The DW_OP_fbreg operation provides a signed LEB128 offset from the address specified by the location description in the DW_AT_frame_base
-    // attribute of the current function. This is typically a stack pointer register plus or minus some offset
-    // since in signal handler we are know SP value, just use it as DW_AT_frame_base
-
     unw_word_t sp;
     if(unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp)) {
         return false;
@@ -831,7 +820,7 @@ bool dw_op_fbreg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
     return true;
 }
 
-
+// DWARF Operations to code & name mapping
 dwarf_op_map dw_op[] = {
 		{DW_OP_addr, 		"DW_OP_addr", 		dw_op_addr},
 		{DW_OP_deref, 		"DW_OP_deref", 		dw_op_deref},
@@ -879,7 +868,7 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_lt,			"DW_OP_lt",			dw_op_notimpl},
 		{DW_OP_ne,			"DW_OP_ne",			dw_op_notimpl},
 		{DW_OP_skip,		"DW_OP_skip",		dw_op_notimpl},
-		//DWARF5 2.5.1.1 Literal Encodings
+		// DWARF5 2.5.1.1 Literal Encodings
 		{DW_OP_lit0,		"DW_OP_lit0",		dw_op_lit_x},
 		{DW_OP_lit1,		"DW_OP_lit1",		dw_op_lit_x},
 		{DW_OP_lit2,		"DW_OP_lit2",		dw_op_lit_x},
@@ -912,7 +901,7 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_lit29,		"DW_OP_lit29",		dw_op_lit_x},
 		{DW_OP_lit30,		"DW_OP_lit30",		dw_op_lit_x},
 		{DW_OP_lit31,		"DW_OP_lit31",		dw_op_lit_x},
-		// Register location descriptions.
+		// Register location descriptions. I.e. register containing the value
 		// GP Registers
 		{DW_OP_reg0, 		"DW_OP_reg0",		dw_op_reg_x},
 		{DW_OP_reg1, 		"DW_OP_reg1",		dw_op_reg_x},
@@ -948,7 +937,7 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_reg29, 		"DW_OP_reg29",		dw_op_reg_x},
 		{DW_OP_reg30, 		"DW_OP_reg30",		dw_op_reg_x},
 		{DW_OP_reg31, 		"DW_OP_reg31",		dw_op_reg_x},
-		// Register values.
+		// Register values. I.e. appropriate register value + offset of operation is pushed onto the stack
 		// GP Registers
 		{DW_OP_breg0,		"DW_OP_breg0", 		dw_op_breg_x},
 		{DW_OP_breg1,		"DW_OP_breg1", 		dw_op_breg_x},
@@ -984,12 +973,26 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_breg29, 		"DW_OP_breg29", 	dw_op_breg_x},
 		{DW_OP_breg30, 		"DW_OP_breg30", 	dw_op_breg_x},
 		{DW_OP_breg31, 		"DW_OP_breg31", 	dw_op_breg_x},
+		// special register-related commands
+		{DW_OP_regx, 		"DW_OP_regx",		dw_op_reg_x},   // 1st operand register name
+		{DW_OP_fbreg, 		"DW_OP_fbreg", 		dw_op_fbreg},   // base is Frame base register there
+		{DW_OP_bregx,		"DW_OP_bregx", 		dw_op_breg_x},  // base is value of 1st operand's register
 
-		{DW_OP_regx, 		"DW_OP_regx",		dw_op_reg_x},
-		{DW_OP_fbreg, 		"DW_OP_fbreg", 		dw_op_fbreg},
-		{DW_OP_bregx,		"DW_OP_bregx", 		dw_op_breg_x},
-		{DW_OP_call_frame_cfa, "DW_OP_call_frame_cfa", dw_op_call_frame_cfa},
-		{DW_OP_stack_value, "DW_OP_stack_value", dw_op_stack_value},
+		// not implemented
+		{DW_OP_piece,               "DW_OP_piece",              dw_op_notimpl},
+		{DW_OP_deref_size,          "DW_OP_deref_size",         dw_op_notimpl},
+		{DW_OP_xderef_size,         "DW_OP_xderef_size",        dw_op_notimpl},
+		{DW_OP_nop,                 "DW_OP_nop",                dw_op_notimpl},
+		{DW_OP_push_object_address, "DW_OP_push_object_address",dw_op_notimpl},
+		{DW_OP_call2,               "DW_OP_call2",              dw_op_notimpl},
+		{DW_OP_call4,               "DW_OP_call4",              dw_op_notimpl},
+		{DW_OP_call_ref,            "DW_OP_call_ref",           dw_op_notimpl},
+		{DW_OP_form_tls_address,    "DW_OP_form_tls_address",   dw_op_notimpl},
+		{DW_OP_call_frame_cfa,      "DW_OP_call_frame_cfa",     dw_op_call_frame_cfa},
+		{DW_OP_bit_piece,           "DW_OP_bit_piece",          dw_op_notimpl},
+		{DW_OP_implicit_value,      "DW_OP_implicit_value",     dw_op_notimpl},
+		{DW_OP_stack_value,         "DW_OP_stack_value",        dw_op_stack_value},
+
 		// This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
 		// simple register or DWARF expression
 		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value", dw_op_notimpl},
