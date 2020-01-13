@@ -56,19 +56,19 @@ bool dw_op_notimpl(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dw
 	return false;
 }
 
+// The DW_OP_addr operation has a single operand that encodes a machine
+// address and whose size is the size of an address on the target machine.
 bool dw_op_addr(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_addr operation has a single operand that encodes a machine
-	// address and whose size is the size of an address on the target machine.
 	ctx->stack.push(&op1, sizeof(op1), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
 	return true;
 }
 
+// The DW_ OP_deref operation pops the top stack entry and treats it as an address.
+// The popped value must have an integral type. The value retrieved from that address is pushed, and has the generic type.
+// The size of the data retrieved from the dereferenced address is the size of an address on the target machine.
 bool dw_op_deref(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_ OP_deref operation pops the top stack entry and treats it as an address.
-	// The popped value must have an integral type. The value retrieved from that address is pushed, and has the generic type.
-	// The size of the data retrieved from the dereferenced address is the size of an address on the target machine.
 	dwarf_value* value = ctx->stack.pop();
 	if(value) {
 		uint64_t v = *((uint64_t*)value->value);
@@ -80,10 +80,10 @@ bool dw_op_deref(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 	return false;
 }
 
+// DW_OP_const1u, DW_OP_const2u, DW_OP_const4u, DW_OP_const8u. The single operand of a DW_OP_const<n>u operation provides a 1, 2, 4, or  8-byte unsigned integer constant, respectively.
+// These operations push a value with the generic type
 bool dw_op_const_x_u(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// DW_OP_const1u, DW_OP_const2u, DW_OP_const4u, DW_OP_const8u. The single operand of a DW_OP_const<n>u operation provides a 1, 2, 4, or  8-byte unsigned integer constant, respectively.
-	// These operations push a value with the generic type
 	uint8_t size = 0;
 	dwarf_value_type type = DWARF_TYPE_UNSIGNED;
 	switch (map->op_num) {
@@ -112,25 +112,25 @@ bool dw_op_const_x_u(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, 
 	return true;
 }
 
+// DW_OP_const1s, DW_OP_const2s, DW_OP_const4s, DW_OP_const8s. The single operand of a DW_OP_const<n>s operation provides a 1, 2, 4, or 8-byte signed integer constant, respectively.
+// These operations push a value with the generic type
 bool dw_op_const_x_s(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// DW_OP_const1s, DW_OP_const2s, DW_OP_const4s, DW_OP_const8s. The single operand of a DW_OP_const<n>s operation provides a 1, 2, 4, or 8-byte signed integer constant, respectively.
-	// These operations push a value with the generic type
 	uint8_t size; int64_t v;
 	dwarf_value_type type = DWARF_TYPE_SIGNED;
 	switch (map->op_num) {
 		case DW_OP_const1s:
-			*((int8_t*)(&v)) = (int8_t)op1;
+			v = (int8_t)op1;
 			size = sizeof(int8_t);
 			type = DWARF_TYPE_CHAR;
 			break;
 		case DW_OP_const2s:
-			*((int16_t*)(&v)) = (int16_t)op1;
+			v = (int16_t)op1;
 			size = sizeof(int16_t);
 			type = DWARF_TYPE_SHORT;
 			break;
 		case DW_OP_const4s:
-			*((int32_t*)(&v)) = (int32_t)op1;
+			v = (int32_t)op1;
 			size = sizeof(int32_t);
 			type = DWARF_TYPE_INT;
 			break;
@@ -143,14 +143,14 @@ bool dw_op_const_x_s(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, 
 			return false;
 	}
 
-	ctx->stack.push(&op1, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
+	ctx->stack.push(&v, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 
 	return true;
 }
 
+// The single operand of the DW_OP_constu operation provides an unsigned LEB128 integer constant.
 bool dw_op_constu(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The single operand of the DW_OP_constu operation provides an unsigned LEB128 integer constant.
 	uint64_t value = decode_uleb128((unsigned char*)&op1);
 	ctx->stack.push(&value, sizeof(value), DWARF_TYPE_LONG | DWARF_TYPE_UNSIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 	return true;
@@ -164,40 +164,38 @@ bool dw_op_consts(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 	return true;
 }
 
+// The DW_OP_dup operation duplicates the value (including its type identifier) at the top of the stack.
 bool dw_op_dup(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_dup operation duplicates the value (including its type identifier) at the top of the stack.
 	dwarf_value* value = ctx->stack.get();
 	ctx->stack.push(value->value, value->size, value->type);
 
 	return true;
 }
 
+// The DW_OP_drop operation pops the value (including its type identifier) at the top of the stack.
 bool dw_op_drop(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_drop operation pops the value (including its type identifier) at the top of the stack.
 	dwarf_value* value = ctx->stack.pop();
 	free(value);
 
 	return true;
 }
 
+// The DW_OP_over operation duplicates the entry currently second in the stack at the top of the stack.
+// This is equivalent to a DW_OP_pick operation, with index 1.
 bool dw_op_over(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_over operation duplicates the entry currently second in the stack at the top of the stack.
-	// This is equivalent to a DW_OP_pick operation, with index 1.
-
 	dwarf_value* value = ctx->stack.get(1);
 	ctx->stack.push(value->value, value->size, value->type);
 
 	return true;
 }
 
+// The single operand of the DW_OP_pick operation provides a 1-byte index.
+// A copy of the stack entry (including its type identifier) with the specified index (0 through 255, inclusive) is pushed onto the stack.
 bool dw_op_pick(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The single operand of the DW_OP_pick operation provides a 1-byte index.
-	// A copy of the stack entry (including its type identifier) with the specified index (0 through 255, inclusive) is pushed onto the stack.
-
 	dwarf_value* value = ctx->stack.get(op1);
 	if(value) {
 		ctx->stack.push(value->value, value->size, value->type);
@@ -207,11 +205,10 @@ bool dw_op_pick(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 	return false;
 }
 
+// The DW_OP_swap operation swaps the top two stack entries. The entry at the top of the stack (including its type identifier) becomes the second stack
+// entry, and the second entry (including its type identifier) becomes the top of the stack.
 bool dw_op_swap(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_swap operation swaps the top two stack entries. The entry at the top of the stack (including its type identifier) becomes the second stack
-	// entry, and the second entry (including its type identifier) becomes the top of the stack.
-
 	dwarf_value* value1 = ctx->stack.pop();
 	dwarf_value* value2 = ctx->stack.pop();
 	if(value1 && value2) {
@@ -221,22 +218,21 @@ bool dw_op_swap(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 	}
 
 	if(value1) {
-	    free(value1);
+	    delete(value1);
 	}
 	if(value2) {
-	    free(value2);
+	    delete(value2);
 	}
 
 	return false;
 }
 
+// The DW_OP_rot operation rotates the first three stack entries.
+// The entry at the top of the stack (including its type identifier) becomes the third stack entry,
+// the second entry (including its type identifier) becomes the top of the stack,
+// and the third entry (including its type identifier) becomes the second entry
 bool dw_op_rot(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_rot operation rotates the first three stack entries.
-	// The entry at the top of the stack (including its type identifier) becomes the third stack entry,
-	// the second entry (including its type identifier) becomes the top of the stack,
-	// and the third entry (including its type identifier) becomes the second entry
-
 	dwarf_value* value1 = ctx->stack.pop();
 	dwarf_value* value2 = ctx->stack.pop();
 	dwarf_value* value3 = ctx->stack.pop();
@@ -260,11 +256,10 @@ bool dw_op_rot(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_abs operation pops the top stack entry, interprets it as a signed value and pushes its absolute value.
+// If the absolute value cannot be represented, the result is undefined.
 bool dw_op_abs(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_abs operation pops the top stack entry, interprets it as a signed value and pushes its absolute value.
-	// If the absolute value cannot be represented, the result is undefined.
-
 	dwarf_value* value = ctx->stack.get();
 	if(value) {
 		int64_t v;
@@ -279,10 +274,9 @@ bool dw_op_abs(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_and operation pops the top two stack values, performs a bitwise and operation on the two, and pushes the result.
 bool dw_op_and(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_and operation pops the top two stack values, performs a bitwise and operation on the two, and pushes the result.
-
 	dwarf_value* value1 = ctx->stack.get(0);
 	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
@@ -309,10 +303,9 @@ bool dw_op_and(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_div operation pops the top two stack values, divides the former second entry by the former top of the stack using signed division, and pushes the result.
 bool dw_op_div(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_div operation pops the top two stack values, divides the former second entry by the former top of the stack using signed division, and pushes the result.
-
 	dwarf_value* value1 = ctx->stack.get(0);
 	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
@@ -397,13 +390,11 @@ bool dw_op_div(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_minus operation pops the top two stack values, subtracts the former top of the stack from the former second entry, and pushes the result.
 bool dw_op_minus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_minus operation pops the top two stack values, subtracts the former top of the stack from the former second entry, and pushes the result.
-
 	dwarf_value* value1 = ctx->stack.get(0);
 	dwarf_value* value2 = ctx->stack.get(1);
-	uint64_t unres; int64_t sigres; void* res;
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
@@ -433,10 +424,9 @@ bool dw_op_minus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 	return false;
 }
 
+// The DW_OP_mod operation pops the top two stack values and pushes the result of the calculation: former second stack entry modulo the former top of the stack.
 bool dw_op_mod(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_mod operation pops the top two stack values and pushes the result of the calculation: former second stack entry modulo the former top of the stack.
-
 	dwarf_value* value1 = ctx->stack.get(0);
 	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
@@ -469,10 +459,9 @@ bool dw_op_mod(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_mul operation pops the top two stack entries, multiplies them together, and pushes the result.
 bool dw_op_mul(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_mul operation pops the top two stack entries, multiplies them together, and pushes the result.
-
     dwarf_value* value1 = ctx->stack.get(0);
     dwarf_value* value2 = ctx->stack.get(1);
     if(value1 && value2) {
@@ -603,11 +592,9 @@ bool dw_op_neg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_not operation pops the top stack entry, and pushes its bitwise complement.
 bool dw_op_not(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_not operation pops the top stack entry, and pushes its bitwise complement.
-
-
 	dwarf_value* value = ctx->stack.get();
 	if(value) {
 		uint64_t v = 0;
@@ -625,12 +612,11 @@ bool dw_op_not(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_
 	return false;
 }
 
+// The DW_OP_or operation pops the top two stack entries, performs a bitwise or operation on the two, and pushes the result.
 bool dw_op_or(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_or operation pops the top two stack entries, performs a bitwise or operation on the two, and pushes the result.
-
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
+    dwarf_value* value1 = ctx->stack.get(0);
+    dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
@@ -648,6 +634,7 @@ bool dw_op_or(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_W
 		}
 
 		uint64_t res = v2 | v1;
+        ctx->stack.pop(); ctx->stack.pop();
 		ctx->stack.push(&res, value1->size, value1->type);
 		return true;
 	}
@@ -655,12 +642,11 @@ bool dw_op_or(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_W
 	return false;
 }
 
+// The DW_OP_plus operation pops the top two stack entries, adds them together, and pushes the result
 bool dw_op_plus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_plus operation pops the top two stack entries, adds them together, and pushes the result
-
-	dwarf_value* value1 = ctx->stack.pop();
-	dwarf_value* value2 = ctx->stack.pop();
+	dwarf_value* value1 = ctx->stack.get(0);
+	dwarf_value* value2 = ctx->stack.get(1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%d, %d)", map->op_name, value1->type, value2->type);
@@ -678,6 +664,7 @@ bool dw_op_plus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 		}
 
 		uint64_t res = v2 + v1;
+		ctx->stack.pop(); ctx->stack.pop();
 		ctx->stack.push(&res, value1->size, value1->type);
 		return true;
 	}
@@ -685,13 +672,12 @@ bool dw_op_plus(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf
 	return false;
 }
 
+// The DW_OP_plus_uconst operation pops the top stack entry, adds it to the unsigned LEB128 constant operand interpreted as the same type as the
+// operand popped from the top of the stack and pushes the result.
+// This operation is supplied specifically to be able to encode more field offsets in two
+// bytes than can be done with “DW_OP_lit<n> DW_OP_plus.”
 bool dw_op_plus_uconst(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_plus_uconst operation pops the top stack entry, adds it to the unsigned LEB128 constant operand interpreted as the same type as the
-	// operand popped from the top of the stack and pushes the result.
-	// This operation is supplied specifically to be able to encode more field offsets in two
-	// bytes than can be done with “DW_OP_lit<n> DW_OP_plus.”
-
 	dwarf_value* value = ctx->stack.get();
 	if(value) {
 		if(value->type != DWARF_TYPE_SIGNED && value->type != DWARF_TYPE_UNSIGNED) {
@@ -727,9 +713,9 @@ bool dw_op_plus_uconst(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1
 // Register location descriptions. From DWARF 5, section 2.6.1.1.3:
 // Register location descriptions describe an object (or a piece of an object) that resides in a register.
 // A register location description must stand alone as the entire description of an object or a piece of an object.
+// The DW_OP_regx operation has a single unsigned LEB128 literal operand that encodes the name of a register
 bool dw_op_reg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	// The DW_OP_regx operation has a single unsigned LEB128 literal operand that encodes the name of a register
 	if(map->op_num != DW_OP_regx && (map->op_num < DW_OP_reg0 || map->op_num > DW_OP_reg31)) {
 		return false;
 	}
