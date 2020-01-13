@@ -58,12 +58,6 @@ bool dwarf_value::get_uint(uint64_t& v)
     return true;
 }
 
-__dwarf_value& dwarf_value::operator+=(const __dwarf_value& rhs)
-{
-
-    return *this;
-}
-
 bool dwarf_value::get_generic(uint64_t& v)
 {
     switch (size) {

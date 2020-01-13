@@ -59,7 +59,6 @@ typedef struct __dwarf_value : public SC_ListNode {
 	bool get_uint(uint64_t& v);
 	bool get_int(int64_t& v);
 	bool get_generic(uint64_t& v);
-	__dwarf_value& operator+=(const __dwarf_value& rhs);
 
 	char* 				value;
 	uint32_t 			size;   // size in bytes except of 'DWARF_TYPE_PIECE', in such case in bits
@@ -91,6 +90,7 @@ typedef struct __dwarf_stack : public SC_ListHead {
 
 		return value;
 	}
+
 	dwarf_value* get(uint32_t idx = 0) {
 		dwarf_value* value = NULL;
 		for(value = (dwarf_value*)First(); value && idx; value = (dwarf_value*)Next(value)) {
