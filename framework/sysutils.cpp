@@ -275,6 +275,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 				char str[1024]; str[0] = 0;
 				ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
 				ctx->log(SEVERITY_DEBUG, "Found DW_AT_framebase expression: %s", str);
+				ctx->calc_expression(expr, exprlen, attr);
 			} else {
 				ctx->log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X", attr->form, attr->code);
 			}

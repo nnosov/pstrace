@@ -159,7 +159,7 @@ bool dw_op_constu(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 bool dw_op_consts(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
 	// The single operand of the DW_OP_consts operation provides a signed LEB128 integer constant.
-	uint64_t value = decode_sleb128((unsigned char*)&op1);
+	int64_t value = decode_sleb128((unsigned char*)&op1);
 	ctx->stack.push(&value, sizeof(value),  DWARF_TYPE_LONG | DWARF_TYPE_SIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 	return true;
 }
@@ -807,6 +807,45 @@ bool dw_op_stack_value(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1
     return false;
 }
 
+bool dw_op_call_frame_cfa(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+    // DWARF5, Section 2.6.1.1.4:
+    // The DW_OP_stack_value operation specifies that the object does not exist in memory but its value is nonetheless known and is at the top of the DWARF
+    // expression stack. In this form of location description, the DWARF expression represents the actual value of the object, rather than its location.
+    // The DW_OP_stack_value operation terminates the expression.
+
+    // since in signal handler we are know SP value, just push it to DWARF stack
+
+    unw_word_t sp;
+    if(unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp)) {
+        return false;
+    }
+
+    ctx->stack.push(&sp, sizeof(sp), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+
+    return true;
+}
+
+bool dw_op_fbreg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+    // The DW_OP_fbreg operation provides a signed LEB128 offset from the address specified by the location description in the DW_AT_frame_base
+    // attribute of the current function. This is typically a stack pointer register plus or minus some offset
+    // since in signal handler we are know SP value, just use it as DW_AT_frame_base
+
+    unw_word_t sp;
+    if(unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp)) {
+        return false;
+    }
+
+    int64_t off = decode_sleb128((unsigned char*)&op1);
+    sp += off;
+
+    ctx->stack.push(&sp, sizeof(sp), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+
+    return true;
+}
+
+
 dwarf_op_map dw_op[] = {
 		{DW_OP_addr, 		"DW_OP_addr", 		dw_op_addr},
 		{DW_OP_deref, 		"DW_OP_deref", 		dw_op_deref},
@@ -961,11 +1000,9 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_breg31, 		"DW_OP_breg31", 	dw_op_breg_x},
 
 		{DW_OP_regx, 		"DW_OP_regx",		dw_op_reg_x},
-		// The DW_OP_fbreg operation provides a signed LEB128 offset from the address specified by the location description in the DW_AT_frame_base
-		// attribute of the current function. This is typically a stack pointer register plus or minus some offset
-		{DW_OP_fbreg, 		"DW_OP_fbreg", 		dw_op_notimpl},
+		{DW_OP_fbreg, 		"DW_OP_fbreg", 		dw_op_fbreg},
 		{DW_OP_bregx,		"DW_OP_bregx", 		dw_op_breg_x},
-		{DW_OP_call_frame_cfa, "DW_OP_call_frame_cfa", dw_op_notimpl},
+		{DW_OP_call_frame_cfa, "DW_OP_call_frame_cfa", dw_op_call_frame_cfa},
 		{DW_OP_stack_value, "DW_OP_stack_value", dw_op_stack_value},
 		// This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
 		// simple register or DWARF expression
