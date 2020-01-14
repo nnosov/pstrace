@@ -115,12 +115,20 @@ bool __pst_parameter::print_dwarf()
 {
     if(types.size()) {
         if(!is_return) {
-            ctx->print("%s %s = 0x%lX", types[0].c_str(), name.c_str(), value);
+            if(has_value) {
+                ctx->print("%s %s = 0x%lX", types[0].c_str(), name.c_str(), value);
+            } else {
+                ctx->print("%s %s = <undefined>", types[0].c_str(), name.c_str());
+            }
         } else {
             ctx->print("%s", types[0].c_str());
         }
     } else {
-        ctx->print("%s = 0x%lX", name.c_str(), value);
+        if(has_value) {
+            ctx->print("%s = 0x%lX", name.c_str(), value);
+        } else {
+            ctx->print("%s = <undefined>", name.c_str(), value);
+        }
     }
     return true;
 }
@@ -222,8 +230,8 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 
 	dwarf_stack stack(ctx);
 	// determine location of parameter in stack/heap or CPU registers
-	attr = dwarf_attr(result, DW_AT_location, &attr_mem);
-	if(attr) {
+	if(dwarf_hasattr(result, DW_AT_location)) {
+	    attr = dwarf_attr(result, DW_AT_location, &attr_mem);
 		if(dwarf_hasform(attr, DW_FORM_exprloc)) {
 			Dwarf_Op *expr;
 			size_t exprlen;
@@ -232,6 +240,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
                 ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
                 if(stack.calc_expression(expr, exprlen, attr)) {
                     if(stack.get_value(value)) {
+                        has_value = true;
                         ctx->log(SEVERITY_DEBUG, "DW_AT_location expression: \"%s\" ==> 0x%lX", str, value);
                     } else {
                         ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
@@ -254,24 +263,49 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	                ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
 	                if(stack.calc_expression(expr, exprlen, attr)) {
 	                    if(stack.get_value(value)) {
+	                        has_value = true;
 	                        ctx->log(SEVERITY_DEBUG, "Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64"), \"%s\" ==> 0x%lX", i, start, end, str, value);
 	                    } else {
-                            ctx->log(SEVERITY_DEBUG, "Failed to get value of calculated Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\" ==> 0x%lX",
-                                    i, start, end, str, value);
+                            ctx->log(SEVERITY_DEBUG, "Failed to get value of calculated Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\"",
+                                    i, start, end, str);
 	                    }
 	                } else {
-                        ctx->log(SEVERITY_DEBUG, "Failed to calculate Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\" ==> 0x%lX",
-                                i, start, end, str, value);
+                        ctx->log(SEVERITY_DEBUG, "Failed to calculate Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\"",
+                                i, start, end, str);
 	                }
 
 			    } else {
 			        // Location skipped due to don't match current PC offset
+			        ctx->log(SEVERITY_DEBUG, "Skip Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 ")", i, start, end);
 			    }
 			}
 
 		} else {
 			ctx->log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X, ", attr->form, attr->code);
 		}
+	} else if(dwarf_hasattr(result, DW_AT_const_value)) {
+	    attr = dwarf_attr(result, DW_AT_const_value, &attr_mem);
+	    ctx->log(SEVERITY_DEBUG, "Const value form is: 0x%X", dwarf_whatform(attr));
+	    switch (dwarf_whatform(attr)) {
+	        case DW_FORM_string:
+	            // do nothing for now
+	            break;
+	        case DW_FORM_data1:
+	        case DW_FORM_data2:
+	        case DW_FORM_data4:
+	        case DW_FORM_data8:
+                dwarf_formudata(attr, &value);
+                has_value = true;
+                break;
+	        case DW_FORM_sdata:
+	            dwarf_formsdata(attr, (int64_t*)&value);
+	            has_value = true;
+	            break;
+	        case DW_FORM_udata:
+	            dwarf_formudata(attr, &value);
+	            has_value = true;
+	            break;
+	    }
 	}
 
 	//  handle DW_AT_default_value to get information about default value for DW_TAG_formal_parameter type of function

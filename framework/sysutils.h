@@ -36,6 +36,7 @@ typedef struct __pst_parameter {
 		loc = NULL;
 		is_return = false;
 		is_variable = false;
+		has_value = false;
 		value = 0;
 		line = 0;
 	}
@@ -53,6 +54,7 @@ typedef struct __pst_parameter {
 	void*						loc;	// pointer to location of parameter's value
 	bool						is_return; // whether this parameter is return value of the function
 	bool                        is_variable;// whether this parameter is function variable or argument of function
+	bool                        has_value;
 	uint64_t					value;	// value of parameter
 	pst_context*				ctx;
 } pst_parameter;
