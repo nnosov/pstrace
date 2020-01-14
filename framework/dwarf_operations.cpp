@@ -13,40 +13,76 @@
 
 dwarf_reg_map	reg_map[] = {
 	// GP Registers
-	{0x0,  "RAX", "DW_OP_reg0"},
-	{0x1,  "RDX", "DW_OP_reg1"},
-	{0x2,  "RCX", "DW_OP_reg2"},
-	{0x3,  "RBX", "DW_OP_reg3"},
-	{0x4,  "RSI", "DW_OP_reg4"},
-	{0x5,  "RDI", "DW_OP_reg5"},
-	{0x6,  "RBP", "DW_OP_reg6"},
-	{0x7,  "RSP", "DW_OP_reg7"},
+	{0x0,  "RAX",   DW_OP_reg0},
+	{0x1,  "RDX",   DW_OP_reg1},
+	{0x2,  "RCX",   DW_OP_reg2},
+	{0x3,  "RBX",   DW_OP_reg3},
+	{0x4,  "RSI",   DW_OP_reg4},
+	{0x5,  "RDI",   DW_OP_reg5},
+	{0x6,  "RBP",   DW_OP_reg6},
+	{0x7,  "RSP",   DW_OP_reg7},
 	// Extended GP Registers
-	{0x8,  "R8",  "DW_OP_reg8"},
-	{0x9,  "R9",  "DW_OP_reg9"},
-	{0xA,  "R10", "DW_OP_reg10"},
-	{0xB,  "R11", "DW_OP_reg11"},
-	{0xC,  "R12", "DW_OP_reg12"},
-	{0xD,  "R13", "DW_OP_reg13"},
-	{0xE,  "R14", "DW_OP_reg14"},
-	{0xF,  "R15", "DW_OP_reg15"},
-	{0x10, "RIP", "DW_OP_reg16"}, // Return Address (RA) mapped to RIP
+	{0x8,  "R8",    DW_OP_reg8},
+	{0x9,  "R9",    DW_OP_reg9},
+	{0xA,  "R10",   DW_OP_reg10},
+	{0xB,  "R11",   DW_OP_reg11},
+	{0xC,  "R12",   DW_OP_reg12},
+	{0xD,  "R13",   DW_OP_reg13},
+	{0xE,  "R14",   DW_OP_reg14},
+	{0xF,  "R15",   DW_OP_reg15},
+	{0x10, "RIP",   DW_OP_reg16}, // Return Address (RA) mapped to RIP
 	// SSE Vector Registers
-	{0x11, "XMM0", "DW_OP_reg17"},
-	{0x12, "XMM1", "DW_OP_reg18"},
-	{0x13, "XMM2", "DW_OP_reg19"},
-	{0x14, "XMM3", "DW_OP_reg20"},
-	{0x15, "XMM4", "DW_OP_reg21"},
-	{0x16, "XMM5", "DW_OP_reg22"},
-	{0x17, "XMM6", "DW_OP_reg23"},
-	{0x18, "XMM7", "DW_OP_reg24"},
-	{0x19, "XMM8", "DW_OP_reg25"},
-	{0x1a, "XMM9", "DW_OP_reg26"},
-	{0x1b, "XMM10", "DW_OP_reg27"},
-	{0x1c, "XMM11", "DW_OP_reg28"},
-	{0x1d, "XMM12", "DW_OP_reg29"},
-	{0x1e, "XMM13", "DW_OP_reg30"},
-	{0x1f, "XMM14", "DW_OP_reg31"},
+	{0x11, "XMM0",  DW_OP_reg17},
+	{0x12, "XMM1",  DW_OP_reg18},
+	{0x13, "XMM2",  DW_OP_reg19},
+	{0x14, "XMM3",  DW_OP_reg20},
+	{0x15, "XMM4",  DW_OP_reg21},
+	{0x16, "XMM5",  DW_OP_reg22},
+	{0x17, "XMM6",  DW_OP_reg23},
+	{0x18, "XMM7",  DW_OP_reg24},
+	{0x19, "XMM8",  DW_OP_reg25},
+	{0x1a, "XMM9",  DW_OP_reg26},
+	{0x1b, "XMM10", DW_OP_reg27},
+	{0x1c, "XMM11", DW_OP_reg28},
+	{0x1d, "XMM12", DW_OP_reg29},
+	{0x1e, "XMM13", DW_OP_reg30},
+	{0x1f, "XMM14", DW_OP_reg31},
+
+    // GP Registers
+    {0x0,  "RAX",   DW_OP_breg0},
+    {0x1,  "RDX",   DW_OP_breg1},
+    {0x2,  "RCX",   DW_OP_breg2},
+    {0x3,  "RBX",   DW_OP_breg3},
+    {0x4,  "RSI",   DW_OP_breg4},
+    {0x5,  "RDI",   DW_OP_breg5},
+    {0x6,  "RBP",   DW_OP_breg6},
+    {0x7,  "RSP",   DW_OP_breg7},
+    // Extended GP Registers
+    {0x8,  "R8",    DW_OP_breg8},
+    {0x9,  "R9",    DW_OP_breg9},
+    {0xA,  "R10",   DW_OP_breg10},
+    {0xB,  "R11",   DW_OP_breg11},
+    {0xC,  "R12",   DW_OP_breg12},
+    {0xD,  "R13",   DW_OP_breg13},
+    {0xE,  "R14",   DW_OP_breg14},
+    {0xF,  "R15",   DW_OP_breg15},
+    {0x10, "RIP",   DW_OP_breg16}, // Return Address (RA) mapped to RIP
+    // SSE Vector Registers
+    {0x11, "XMM0",  DW_OP_breg17},
+    {0x12, "XMM1",  DW_OP_breg18},
+    {0x13, "XMM2",  DW_OP_breg19},
+    {0x14, "XMM3",  DW_OP_breg20},
+    {0x15, "XMM4",  DW_OP_breg21},
+    {0x16, "XMM5",  DW_OP_breg22},
+    {0x17, "XMM6",  DW_OP_breg23},
+    {0x18, "XMM7",  DW_OP_breg24},
+    {0x19, "XMM8",  DW_OP_breg25},
+    {0x1a, "XMM9",  DW_OP_breg26},
+    {0x1b, "XMM10", DW_OP_breg27},
+    {0x1c, "XMM11", DW_OP_breg28},
+    {0x1d, "XMM12", DW_OP_breg29},
+    {0x1e, "XMM13", DW_OP_breg30},
+    {0x1f, "XMM14", DW_OP_breg31},
 };
 
 // not implemented operations
@@ -739,12 +775,12 @@ bool dw_op_breg_x(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 		return false;
 	}
 
-	uint64_t regno = 0; int64_t off = 0;
+	int regno = -1; int64_t off = 0;
 	if(map->op_num == DW_OP_bregx) {
 		regno = decode_uleb128((unsigned char*)&op1);
 		off = decode_sleb128((unsigned char*)&op2);
 	} else {
-		regno = map->op_num - DW_OP_breg0;
+		regno = find_regnum(map->op_num);
 		off = decode_sleb128((unsigned char*)&op1);
 	}
 
@@ -821,7 +857,7 @@ bool dw_op_fbreg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwar
 }
 
 // DWARF Operations to code & name mapping
-dwarf_op_map dw_op[] = {
+dwarf_op_map op_map[] = {
 		{DW_OP_addr, 		"DW_OP_addr", 		dw_op_addr},
 		{DW_OP_deref, 		"DW_OP_deref", 		dw_op_deref},
 		// Constant operations
@@ -993,14 +1029,26 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_implicit_value,      "DW_OP_implicit_value",     dw_op_notimpl},
 		{DW_OP_stack_value,         "DW_OP_stack_value",        dw_op_stack_value},
 		// in fact, implementation is at upper layer since this operation contains sub-expression
-		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value", dw_op_notimpl},
+		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value",        dw_op_notimpl},
 };
+
+int find_regnum(uint32_t op)
+{
+    for(uint32_t i = 0; i < sizeof(reg_map) / sizeof(dwarf_reg_map); ++i) {
+        if(reg_map[i].op_num == op) {
+            return reg_map[i].regno;
+            return true;
+        }
+    }
+
+    return -1;
+}
 
 const dwarf_op_map* find_op_map(int op)
 {
-	for(uint32_t i = 0; i < sizeof(dw_op) / sizeof(dwarf_op_map); ++i) {
-		if(dw_op[i].op_num == op) {
-			return &dw_op[i];
+	for(uint32_t i = 0; i < sizeof(op_map) / sizeof(dwarf_op_map); ++i) {
+		if(op_map[i].op_num == op) {
+			return &op_map[i];
 		}
 	}
 
