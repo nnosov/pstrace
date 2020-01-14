@@ -156,6 +156,7 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param)
 			}
 			ctx->log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
 			add_type(dwarf_diename(&ret_die), DW_TAG_base_type);
+			type = DW_TAG_base_type;
 			break;
 		}
 		case DW_TAG_array_type:
@@ -382,11 +383,9 @@ bool __pst_function::print_dwarf()
 
     ctx->print("%s:%u: ", file.c_str(), line);
     bool first = true; bool start_variable = false;
-    pst_parameter* ret = NULL;
     for(pst_parameter* param = next_param(NULL); param; param = next_param(param)) {
         if(param->is_return) {
             // print return value type, function name and start list of parameters
-            ret = param;
             param->print_dwarf();
             ctx->print(" %s(", name.c_str());
             continue;
@@ -479,19 +478,12 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	pst_parameter* ret_p = add_param(); ret_p->is_return = true;
 	attr = dwarf_attr(die, DW_AT_type, &attr_mem);
 	if(attr) {
-		ctx->log(SEVERITY_DEBUG, "Handle return parameter");
-		if(!unw_get_reg(&ctx->cursor, 16, &ret_p->value)) {
-		    ret_p->has_value = true;
-		} else {
-		    ctx->log(SEVERITY_ERROR, "Failed to get return parameter value from RIP");
-		}
 		if(!ret_p->handle_type(attr)) {
 		    ctx->log(SEVERITY_ERROR, "Failed to handle return parameter type");
 			del_param(ret_p);
 		}
 	} else {
 		ret_p->add_type("void", 0);
-		ctx->log(SEVERITY_DEBUG, "return attr name = 'void(0)'");
 	}
 
 	Dwarf_Die result;
