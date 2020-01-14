@@ -37,6 +37,7 @@ typedef struct __pst_parameter {
 		is_return = false;
 		is_variable = false;
 		value = 0;
+		line = 0;
 	}
 
 	bool handle_dwarf(Dwarf_Die* d);
@@ -45,6 +46,7 @@ typedef struct __pst_parameter {
 
 	Dwarf_Die*					die; 	// DWARF DIE containing parameter's definition
 	std::string					name;	// parameter's name
+	uint32_t                    line;   // line of parameter definition
 	Dwarf_Word					size;	// size of parameter in bytes
 	int							type;	// base type of parameter in DW_TAG_XXX types enumeration
 	std::vector<std::string>	types;	// list of parameter's definitions i.e. 'typedef', 'uint32_t'

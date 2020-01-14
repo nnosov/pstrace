@@ -207,6 +207,8 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 
 	name = dwarf_diename(result);
 	is_variable = (dwarf_tag(result) == DW_TAG_variable);
+
+	dwarf_decl_line(result, (int*)&line);
 	// Get reference to attribute type of the parameter/variable
 	attr = dwarf_attr(result, DW_AT_type, &attr_mem);
 	ctx->log(SEVERITY_DEBUG, "Handle '%s' %s", name.c_str(), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
@@ -272,6 +274,8 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 		}
 	}
 
+	//  handle DW_AT_default_value to get information about default value for DW_TAG_formal_parameter type of function
+
 	return true;
 }
 
@@ -280,6 +284,7 @@ bool __pst_function::print_dwarf()
     //std::vector<std::string>::const_iterator param;
     //for (param = params.begin(); param != params.end(); ++param) {
 
+    ctx->print("%s:%u: ", file.c_str(), line);
     bool first = true; bool start_variable = false;
     for(auto param : params) {
         if(param.is_return) {
@@ -295,7 +300,11 @@ bool __pst_function::print_dwarf()
                 ctx->print("{\n");
                 start_variable = true;
             }
-            ctx->print("\t");
+            if(param.line) {
+                ctx->print("%04u:   ", param.line);
+            } else {
+                ctx->print("        ");
+            }
             param.print_dwarf();
             ctx->print(";\n");
         } else {
@@ -412,11 +421,10 @@ bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
 {
 	pc = addr;
 
-	Dwfl_Line *line = dwfl_getsrc(dwfl, addr);
-	if(line != NULL) {
-		int nline;
+	Dwfl_Line *dwline = dwfl_getsrc(dwfl, addr);
+	if(dwline != NULL) {
 		Dwarf_Addr addr;
-		const char* filename = dwfl_lineinfo (line, &addr, &nline, NULL, NULL, NULL);
+		const char* filename = dwfl_lineinfo (dwline, &addr, &line, NULL, NULL, NULL);
 		if(filename) {
 			const char* str = strrchr(filename, '/');
 			if(str && *str != 0) {
@@ -424,7 +432,8 @@ bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
 			} else {
 				str = filename;
 			}
-			ctx->print("%s:%d", str, nline);
+			file = str;
+			ctx->print("%s:%d", str, line);
 		} else {
 			ctx->print("%p", (void*)addr);
 		}
