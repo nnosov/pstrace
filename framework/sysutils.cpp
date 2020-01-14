@@ -285,10 +285,10 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 		}
 	} else if(dwarf_hasattr(result, DW_AT_const_value)) {
 	    attr = dwarf_attr(result, DW_AT_const_value, &attr_mem);
-	    ctx->log(SEVERITY_DEBUG, "Const value form is: 0x%X", dwarf_whatform(attr));
 	    switch (dwarf_whatform(attr)) {
 	        case DW_FORM_string:
 	            // do nothing for now
+	            ctx->log(SEVERITY_WARNING, "Const value form DW_FORM_string is not implemented.");
 	            break;
 	        case DW_FORM_data1:
 	        case DW_FORM_data2:
@@ -322,7 +322,7 @@ bool __pst_function::print_dwarf()
     bool first = true; bool start_variable = false;
     for(auto param : params) {
         if(param.is_return) {
-            // print return value, function name and start list of parameters
+            // print return value type, function name and start list of parameters
             param.print_dwarf();
             ctx->print(" %s(", name.c_str());
             continue;
@@ -350,6 +350,7 @@ bool __pst_function::print_dwarf()
             param.print_dwarf();
         }
     }
+
     if(!start_variable) {
         ctx->print(");\n");
     } else {
@@ -415,6 +416,9 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	attr = dwarf_attr(die, DW_AT_type, &attr_mem);
 	if(attr) {
 		ctx->log(SEVERITY_DEBUG, "Handle return parameter");
+		if(!unw_get_reg(&ctx->cursor, 16, &ret_p.value)) {
+		    ret_p.has_value = true;
+		}
 		if(ret_p.handle_type(attr, true)) {
 			params.push_back(ret_p);
 		}
@@ -511,7 +515,7 @@ bool __pst_handler::get_frame()
     Dwarf_CFI* cfi = dwfl_module_eh_cfi(module, &mod_bias);
     //Dwarf_CFI* cfi = dwfl_module_dwarf_cfi(module, &mod_bias);
     if(!cfi) {
-    	ctx.log(SEVERITY_INFO, "Cannot find CFI for module");
+    	ctx.log(SEVERITY_ERROR, "Cannot find CFI for module");
     	return false;
     }
 
@@ -519,7 +523,7 @@ bool __pst_handler::get_frame()
     int result = dwarf_cfi_addrframe (cfi, addr - mod_bias, &frame);
     if (result == 0) {
     	// get frame information
-    	ctx.log(SEVERITY_INFO, "Found CFI frame for module");
+    	ctx.log(SEVERITY_DEBUG, "Found CFI frame for module");
     	Dwarf_Addr start = addr;
     	Dwarf_Addr end = addr;
     	bool signalp;
@@ -593,7 +597,9 @@ void __pst_handler::print_dwarf()
 {
     ctx.offset = 0;
     ctx.print("DWARF-based stack trace information:\n");
+    uint32_t idx = 0;
     for(auto function : functions) {
+        ctx.print("[%-2u] ", idx); idx++;
         function.print_dwarf();
         ctx.print("\n");
     }
@@ -680,7 +686,7 @@ bool __pst_handler::unwind()
    		ctx.print("[%-2d] ", idx);
 #endif
    		module = dwfl_addrmodule(dwfl, addr);
-   		//get_frame();
+   		get_frame();
    		pst_function fun(&ctx);
    		if(fun.unwind(dwfl, module, pc)) {
    			if(get_dwarf_function(fun)) {
