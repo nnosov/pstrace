@@ -20,12 +20,14 @@ void Fun2(int arg1, uint32_t arg2)
 {
 	int* ptr = NULL;
 	*ptr = arg1;
+	void* ptr2 = ptr+1;
+	printf("%p\n", ptr2);
 }
 
 uint32_t Fun1(const int arg1, my_int arg2, uint32_t arg3)
 {
 	int my_local = arg1 + 2;
-	printf("%d", my_local);
+	printf("%d\n", my_local);
 	Fun2(my_local, arg3);
 	return arg2;
 }
@@ -193,7 +195,7 @@ void ResetSignalHandler() {
 
 int main(int argc, char* argv[])
 {
-    logger->SetCurrentSeverity(SEVERITY_INFO);
+    //logger->SetCurrentSeverity(SEVERITY_INFO);
     SetSignalHandler(SigusrHandler);
 
     Fun1(1, DEF_2, 5);

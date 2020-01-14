@@ -113,27 +113,27 @@ void print_framereg(int regno)
 
 bool __pst_parameter::print_dwarf()
 {
-    if(types.size()) {
+    if(types.Size()) {
         if(!is_return) {
             if(has_value) {
-                ctx->print("%s %s = 0x%lX", types[0].c_str(), name.c_str(), value);
+                ctx->print("%s %s = 0x%lX", next_type(NULL)->name.c_str(), name.c_str(), value);
             } else {
-                ctx->print("%s %s = <undefined>", types[0].c_str(), name.c_str());
+                ctx->print("%s %s = <undefined>", next_type(NULL)->name.c_str(), name.c_str());
             }
         } else {
-            ctx->print("%s", types[0].c_str());
+            ctx->print("%s", next_type(NULL)->name.c_str());
         }
     } else {
         if(has_value) {
             ctx->print("%s = 0x%lX", name.c_str(), value);
         } else {
-            ctx->print("%s = <undefined>", name.c_str(), value);
+            ctx->print("%s = <undefined>", name.c_str());
         }
     }
     return true;
 }
 
-bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
+bool __pst_parameter::handle_type(Dwarf_Attribute* param)
 {
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
@@ -155,43 +155,43 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 				dwarf_formudata(attr, &size);
 			}
 			ctx->log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
-			types.push_back(dwarf_diename(&ret_die));
+			add_type(dwarf_diename(&ret_die), DW_TAG_base_type);
 			break;
 		}
 		case DW_TAG_array_type:
 			ctx->log(SEVERITY_DEBUG, "array type");
-			types.push_back("[]");
+			add_type("[]", DW_TAG_array_type);
 			break;
 		case DW_TAG_structure_type:
 			ctx->log(SEVERITY_DEBUG, "structure type");
-			types.push_back("struct");
+			add_type("struct", DW_TAG_structure_type);
 			break;
 		case DW_TAG_union_type:
 			ctx->log(SEVERITY_DEBUG, "union type");
-			types.push_back("union");
+			add_type("union", DW_TAG_union_type);
 			break;
 		case DW_TAG_class_type:
 			ctx->log(SEVERITY_DEBUG, "class type");
-			types.push_back("class");
+			add_type("class", DW_TAG_class_type);
 			break;
 		case DW_TAG_pointer_type:
 			ctx->log(SEVERITY_DEBUG, "pointer type");
-			types.push_back("*");
+			add_type("*", DW_TAG_pointer_type);
 			break;
 		case DW_TAG_enumeration_type:
 			ctx->log(SEVERITY_DEBUG, "enumeration type");
-			types.push_back("enum");
+			add_type("enum", DW_TAG_enumeration_type);
 			break;
 		case DW_TAG_const_type:
 			ctx->log(SEVERITY_DEBUG, "constant type");
-			types.push_back("const");
+			add_type("const", DW_TAG_const_type);
 			break;
 		case DW_TAG_subroutine_type:
-			ctx->log(SEVERITY_DEBUG, "subroutine type");
+			ctx->log(SEVERITY_DEBUG, "Skipping subroutine type");
 			break;
 		case DW_TAG_typedef:
 			ctx->log(SEVERITY_DEBUG, "typedef '%s' type", dwarf_diename(&ret_die));
-			types.push_back(dwarf_diename(&ret_die));
+			add_type(dwarf_diename(&ret_die), DW_TAG_typedef);
 			break;
 		default:
 			ctx->log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
@@ -204,6 +204,34 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 	}
 
 	return true;
+}
+
+pst_type* __pst_parameter::add_type(const char* name, int type)
+{
+    pst_type* t = new pst_type(name, type);
+    types.InsertLast(t);
+
+    return t;
+}
+
+void __pst_parameter::clear()
+{
+    for(pst_type* t = (pst_type*)types.First(); t; t = (pst_type*)types.First()) {
+        types.Remove(t);
+        delete t;
+    }
+}
+
+pst_type* __pst_parameter::next_type(pst_type* t)
+{
+    pst_type* next = NULL;
+    if(!t) {
+        next = (pst_type*)types.First();
+    } else {
+        next = (pst_type*)types.Next(t);
+    }
+
+    return next;
 }
 
 bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
@@ -313,6 +341,40 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	return true;
 }
 
+pst_parameter* __pst_function::add_param()
+{
+    pst_parameter* p = new pst_parameter(ctx);
+    params.InsertLast(p);
+
+    return p;
+}
+
+void __pst_function::del_param(pst_parameter* p)
+{
+    params.Remove(p);
+    delete p;
+}
+
+void __pst_function::clear()
+{
+    for(pst_parameter* p = (pst_parameter*)params.First(); p; p = (pst_parameter*)params.First()) {
+        params.Remove(p);
+        delete p;
+    }
+}
+
+pst_parameter* __pst_function::next_param(pst_parameter* p)
+{
+    pst_parameter* next = NULL;
+    if(!p) {
+        next = (pst_parameter*)params.First();
+    } else {
+        next = (pst_parameter*)params.Next(p);
+    }
+
+    return next;
+}
+
 bool __pst_function::print_dwarf()
 {
     //std::vector<std::string>::const_iterator param;
@@ -320,26 +382,28 @@ bool __pst_function::print_dwarf()
 
     ctx->print("%s:%u: ", file.c_str(), line);
     bool first = true; bool start_variable = false;
-    for(auto param : params) {
-        if(param.is_return) {
+    pst_parameter* ret = NULL;
+    for(pst_parameter* param = next_param(NULL); param; param = next_param(param)) {
+        if(param->is_return) {
             // print return value type, function name and start list of parameters
-            param.print_dwarf();
+            ret = param;
+            param->print_dwarf();
             ctx->print(" %s(", name.c_str());
             continue;
         }
 
-        if(param.is_variable) {
+        if(param->is_variable) {
             if(!start_variable) {
                 ctx->print(")\n");
                 ctx->print("{\n");
                 start_variable = true;
             }
-            if(param.line) {
-                ctx->print("%04u:   ", param.line);
+            if(param->line) {
+                ctx->print("%04u:   ", param->line);
             } else {
                 ctx->print("        ");
             }
-            param.print_dwarf();
+            param->print_dwarf();
             ctx->print(";\n");
         } else {
             if(first) {
@@ -347,7 +411,7 @@ bool __pst_function::print_dwarf()
             } else {
                 ctx->print(", ");
             }
-            param.print_dwarf();
+            param->print_dwarf();
         }
     }
 
@@ -412,19 +476,21 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 
 	// Get reference to return attribute type of the function
 	// may be to use dwfl_module_return_value_location() instead
-	pst_parameter ret_p(ctx); ret_p.is_return = true;
+	pst_parameter* ret_p = add_param(); ret_p->is_return = true;
 	attr = dwarf_attr(die, DW_AT_type, &attr_mem);
 	if(attr) {
 		ctx->log(SEVERITY_DEBUG, "Handle return parameter");
-		if(!unw_get_reg(&ctx->cursor, 16, &ret_p.value)) {
-		    ret_p.has_value = true;
+		if(!unw_get_reg(&ctx->cursor, 16, &ret_p->value)) {
+		    ret_p->has_value = true;
+		} else {
+		    ctx->log(SEVERITY_ERROR, "Failed to get return parameter value from RIP");
 		}
-		if(ret_p.handle_type(attr, true)) {
-			params.push_back(ret_p);
+		if(!ret_p->handle_type(attr)) {
+		    ctx->log(SEVERITY_ERROR, "Failed to handle return parameter type");
+			del_param(ret_p);
 		}
 	} else {
-		ret_p.types.push_back("void");
-		params.push_back(ret_p);
+		ret_p->add_type("void", 0);
 		ctx->log(SEVERITY_DEBUG, "return attr name = 'void(0)'");
 	}
 
@@ -434,15 +500,17 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 
 	// went through parameters and local variables of the function
 	do {
-		pst_parameter param(ctx);
 
 		switch (dwarf_tag(&result)) {
 		case DW_TAG_formal_parameter:
-		case DW_TAG_variable:
-			if(param.handle_dwarf(&result)) {
-				params.push_back(param);
+		case DW_TAG_variable: {
+		    pst_parameter* param = add_param();
+			if(!param->handle_dwarf(&result)) {
+				del_param(param);
 			}
+
 			break;
+		}
 			//				case DW_TAG_inlined_subroutine:
 			//					/* Recurse further down */
 			//					HandleFunction(&result, dwarf_diename(&result));
@@ -557,7 +625,7 @@ bool __pst_handler::get_frame()
     return true;
 }
 
-bool __pst_handler::get_dwarf_function(pst_function& fun)
+bool __pst_handler::get_dwarf_function(pst_function* fun)
 {
     Dwarf_Addr mod_cu = 0;
     // get CU(Compilation Unit) debug definition
@@ -584,8 +652,8 @@ bool __pst_handler::get_dwarf_function(pst_function& fun)
 	do {
 		int tag = dwarf_tag(&result);
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
-			if(!strcmp(fun.name.c_str(), dwarf_diename(&result))) {
-				return fun.handle_dwarf(&result);
+			if(!strcmp(fun->name.c_str(), dwarf_diename(&result))) {
+				return fun->handle_dwarf(&result);
 			}
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
@@ -593,14 +661,48 @@ bool __pst_handler::get_dwarf_function(pst_function& fun)
 	return nret;
 }
 
+pst_function* __pst_handler::add_function()
+{
+    pst_function* f = new pst_function(&ctx);
+    functions.InsertLast(f);
+
+    return f;
+}
+
+void __pst_handler::del_function(pst_function* f)
+{
+    functions.Remove(f);
+    delete f;
+}
+
+void __pst_handler::clear()
+{
+    for(pst_function* f = (pst_function*)functions.First(); f; f = (pst_function*)functions.First()) {
+        functions.Remove(f);
+        delete f;
+    }
+}
+
+pst_function* __pst_handler::next_function(pst_function* f)
+{
+    pst_function* next = NULL;
+    if(!f) {
+        next = (pst_function*)functions.First();
+    } else {
+        next = (pst_function*)functions.Next(f);
+    }
+
+    return next;
+}
+
 void __pst_handler::print_dwarf()
 {
     ctx.offset = 0;
     ctx.print("DWARF-based stack trace information:\n");
     uint32_t idx = 0;
-    for(auto function : functions) {
+    for(pst_function* function = next_function(NULL); function; function = next_function(function)) {
         ctx.print("[%-2u] ", idx); idx++;
-        function.print_dwarf();
+        function->print_dwarf();
         ctx.print("\n");
     }
 }
@@ -687,11 +789,13 @@ bool __pst_handler::unwind()
 #endif
    		module = dwfl_addrmodule(dwfl, addr);
    		get_frame();
-   		pst_function fun(&ctx);
-   		if(fun.unwind(dwfl, module, pc)) {
-   			if(get_dwarf_function(fun)) {
-   				functions.push_back(fun);
+   		pst_function* fun = add_function();
+   		if(fun->unwind(dwfl, module, pc)) {
+   			if(!get_dwarf_function(fun)) {
+   			    del_function(fun);
    			}
+   		} else {
+   		    del_function(fun);
    		}
    		ctx.print("\n");
 #ifdef USEI_LIBUNWIND
