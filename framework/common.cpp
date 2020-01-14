@@ -191,8 +191,8 @@ bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
         }
 
         dwarf_value* v = stack.get();
+        // dereference register location there if it is not last in stack
         if(v && (v->type & DWARF_TYPE_REGISTER_LOC)) {
-            // dereference register location
             unw_word_t value = 0;
             uint64_t regno = *((uint64_t*)v->value);
             if(unw_get_reg(&cursor, regno, &value)) {
@@ -200,6 +200,29 @@ bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
                 return false;
             }
             v->replace(&value, sizeof(value), DWARF_TYPE_GENERIC);
+        }
+
+        // handle there because it contains sub-expression of Location
+        if(map->op_num == DW_OP_GNU_entry_value) {
+            // This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
+            // simple register or DWARF expression
+            Dwarf_Attribute attr_mem;
+            if(!dwarf_getlocation_attr(attr, exprs, &attr_mem)) {
+                Dwarf_Op *expr;
+                size_t exprlen;
+                if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
+                    //offset += print_expr_block (expr, exprlen, buff + offset, buff_size - offset, &attr_mem);
+                    //offset += snprintf(buff + offset, buff_size - offset, ") ");
+                    if(!calc_expression(expr, exprlen, &attr_mem)) {
+                        log(SEVERITY_ERROR, "Failed to calculate sub-expression for operation %s(0x%lX, 0x%lX)", map->op_name, exprs[i].number, exprs[i].number2);
+                        return false;
+                    }
+                } else {
+                    log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
+                }
+            } else {
+                log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
+            }
         }
 
         if(!map->operation(this, map, exprs[i].number, exprs[i].number2)) {
@@ -215,8 +238,7 @@ bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
         v->get_uint(value);
         if(v->type & DWARF_TYPE_REGISTER_LOC) {
             // dereference register location
-            uint64_t regno;
-            v->get_uint(regno);
+            uint64_t regno = value;
             if(unw_get_reg(&cursor, regno, &value)) {
                 log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
                 return false;

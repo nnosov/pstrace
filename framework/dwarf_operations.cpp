@@ -804,9 +804,9 @@ bool dw_op_call_frame_cfa(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word 
 
 // The DW_OP_fbreg operation provides a signed LEB128 offset from the address specified by the location description in the DW_AT_frame_base
 // attribute of the current function. This is typically a stack pointer register plus or minus some offset
-// since in signal handler we are know SP value, just use it as DW_AT_frame_base
 bool dw_op_fbreg(pst_context* ctx, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
+    // since in signal handler we are know SP value, just use it as DW_AT_frame_base
     unw_word_t sp;
     if(unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp)) {
         return false;
@@ -992,9 +992,7 @@ dwarf_op_map dw_op[] = {
 		{DW_OP_bit_piece,           "DW_OP_bit_piece",          dw_op_notimpl},
 		{DW_OP_implicit_value,      "DW_OP_implicit_value",     dw_op_notimpl},
 		{DW_OP_stack_value,         "DW_OP_stack_value",        dw_op_stack_value},
-
-		// This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
-		// simple register or DWARF expression
+		// in fact, implementation is at upper layer since this operation contains sub-expression
 		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value", dw_op_notimpl},
 };
 

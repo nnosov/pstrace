@@ -100,6 +100,7 @@ typedef struct __dwarf_stack : public SC_ListHead {
 		return value;
 	}
 
+	Dwarf_Attribute*    attr; // attribute which expression currently processed
 } dwarf_stack;
 
 typedef struct __pst_context {
