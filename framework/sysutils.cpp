@@ -202,18 +202,19 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	unw_get_reg(&ctx->cursor, UNW_REG_IP,  &pc);
 	Dwarf_Addr offset = pc - ctx->base_addr;
 
+	dwarf_stack stack(ctx);
 	// determine location of parameter in stack/heap or CPU registers
 	attr = dwarf_attr(result, DW_AT_location, &attr_mem);
 	if(attr) {
 		if(dwarf_hasform(attr, DW_FORM_exprloc)) {
 			Dwarf_Op *expr;
 			size_t exprlen;
-			if (dwarf_getlocation(attr, &expr, &exprlen) == 0) {
+			if(dwarf_getlocation(attr, &expr, &exprlen) == 0) {
 				char str[1024]; str[0] = 0;
                 ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-                if(ctx->calc_expression(expr, exprlen, attr)) {
+                if(stack.calc_expression(expr, exprlen, attr)) {
                     uint64_t value;
-                    if(ctx->get_value(value)) {
+                    if(stack.get_value(value)) {
                         ctx->log(SEVERITY_DEBUG, "DW_AT_location expression: \"%s\" ==> 0x%lX", str, value);
                     } else {
                         ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
@@ -234,9 +235,9 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 			        // actual location, try to calculate Location expression and retrieve value of parameter
 	                char str[1024]; str[0] = 0;
 	                ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-	                if(ctx->calc_expression(expr, exprlen, attr)) {
+	                if(stack.calc_expression(expr, exprlen, attr)) {
 	                    uint64_t value;
-	                    if(ctx->get_value(value)) {
+	                    if(stack.get_value(value)) {
 	                        ctx->log(SEVERITY_DEBUG, "Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64"), \"%s\" ==> 0x%lX", i, start, end, str, value);
 	                    } else {
                             ctx->log(SEVERITY_DEBUG, "Failed to get value of calculated Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\" ==> 0x%lX",
@@ -293,9 +294,10 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 			if (dwarf_getlocation (attr, &expr, &exprlen) == 0) {
 				char str[1024]; str[0] = 0;
 				ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
-				if(ctx->calc_expression(expr, exprlen, attr)) {
+				dwarf_stack stack(ctx);
+				if(stack.calc_expression(expr, exprlen, attr)) {
 				    uint64_t value;
-				    if(ctx->get_value(value)) {
+				    if(stack.get_value(value)) {
 				        ctx->log(SEVERITY_DEBUG, "DW_AT_framebase expression: \"%s\"==> 0x%lX", str, value);
 				    } else {
 				        ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_framebase expression: %s", str);
