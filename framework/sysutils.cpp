@@ -111,6 +111,20 @@ void print_framereg(int regno)
 }
 */
 
+bool __pst_parameter::print_dwarf()
+{
+    if(types.size()) {
+        if(!is_return) {
+            ctx->print("%s %s = 0x%lX", types[0].c_str(), name.c_str(), value);
+        } else {
+            ctx->print("%s", types[0].c_str());
+        }
+    } else {
+        ctx->print("%s = 0x%lX", name.c_str(), value);
+    }
+    return true;
+}
+
 bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 {
 	Dwarf_Attribute attr_mem;
@@ -132,47 +146,47 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param, bool is_return)
 			if(attr) {
 				dwarf_formudata(attr, &size);
 			}
-			ctx->log(SEVERITY_INFO, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
+			ctx->log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
 			types.push_back(dwarf_diename(&ret_die));
 			break;
 		}
 		case DW_TAG_array_type:
-			ctx->log(SEVERITY_INFO, "array type");
+			ctx->log(SEVERITY_DEBUG, "array type");
 			types.push_back("[]");
 			break;
 		case DW_TAG_structure_type:
-			ctx->log(SEVERITY_INFO, "structure type");
+			ctx->log(SEVERITY_DEBUG, "structure type");
 			types.push_back("struct");
 			break;
 		case DW_TAG_union_type:
-			ctx->log(SEVERITY_INFO, "union type");
+			ctx->log(SEVERITY_DEBUG, "union type");
 			types.push_back("union");
 			break;
 		case DW_TAG_class_type:
-			ctx->log(SEVERITY_INFO, "class type");
+			ctx->log(SEVERITY_DEBUG, "class type");
 			types.push_back("class");
 			break;
 		case DW_TAG_pointer_type:
-			ctx->log(SEVERITY_INFO, "pointer type");
+			ctx->log(SEVERITY_DEBUG, "pointer type");
 			types.push_back("*");
 			break;
 		case DW_TAG_enumeration_type:
-			ctx->log(SEVERITY_INFO, "enumeration type");
+			ctx->log(SEVERITY_DEBUG, "enumeration type");
 			types.push_back("enum");
 			break;
 		case DW_TAG_const_type:
-			ctx->log(SEVERITY_INFO, "constant type");
+			ctx->log(SEVERITY_DEBUG, "constant type");
 			types.push_back("const");
 			break;
 		case DW_TAG_subroutine_type:
-			ctx->log(SEVERITY_INFO, "subroutine type");
+			ctx->log(SEVERITY_DEBUG, "subroutine type");
 			break;
 		case DW_TAG_typedef:
-			ctx->log(SEVERITY_INFO, "typedef '%s' type", dwarf_diename(&ret_die));
+			ctx->log(SEVERITY_DEBUG, "typedef '%s' type", dwarf_diename(&ret_die));
 			types.push_back(dwarf_diename(&ret_die));
 			break;
 		default:
-			ctx->log(SEVERITY_INFO, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
+			ctx->log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
 			break;
 	}
 
@@ -191,9 +205,11 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
 
+	name = dwarf_diename(result);
+	is_variable = (dwarf_tag(result) == DW_TAG_variable);
 	// Get reference to attribute type of the parameter/variable
 	attr = dwarf_attr(result, DW_AT_type, &attr_mem);
-	ctx->log(SEVERITY_INFO, "Handle '%s' %s", dwarf_diename(result), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
+	ctx->log(SEVERITY_DEBUG, "Handle '%s' %s", name.c_str(), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
 	if(attr) {
 		handle_type(attr);
 	}
@@ -213,7 +229,6 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 				char str[1024]; str[0] = 0;
                 ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
                 if(stack.calc_expression(expr, exprlen, attr)) {
-                    uint64_t value;
                     if(stack.get_value(value)) {
                         ctx->log(SEVERITY_DEBUG, "DW_AT_location expression: \"%s\" ==> 0x%lX", str, value);
                     } else {
@@ -236,7 +251,6 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	                char str[1024]; str[0] = 0;
 	                ctx->print_expr_block (expr, exprlen, str, sizeof(str), attr);
 	                if(stack.calc_expression(expr, exprlen, attr)) {
-	                    uint64_t value;
 	                    if(stack.get_value(value)) {
 	                        ctx->log(SEVERITY_DEBUG, "Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64"), \"%s\" ==> 0x%lX", i, start, end, str, value);
 	                    } else {
@@ -261,6 +275,47 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	return true;
 }
 
+bool __pst_function::print_dwarf()
+{
+    //std::vector<std::string>::const_iterator param;
+    //for (param = params.begin(); param != params.end(); ++param) {
+
+    bool first = true; bool start_variable = false;
+    for(auto param : params) {
+        if(param.is_return) {
+            // print return value, function name and start list of parameters
+            param.print_dwarf();
+            ctx->print(" %s(", name.c_str());
+            continue;
+        }
+
+        if(param.is_variable) {
+            if(!start_variable) {
+                ctx->print(")\n");
+                ctx->print("{\n");
+                start_variable = true;
+            }
+            ctx->print("\t");
+            param.print_dwarf();
+            ctx->print(";\n");
+        } else {
+            if(first) {
+                first = false;
+            } else {
+                ctx->print(", ");
+            }
+            param.print_dwarf();
+        }
+    }
+    if(!start_variable) {
+        ctx->print(");\n");
+    } else {
+        ctx->print("}\n");
+    }
+
+    return true;
+}
+
 bool __pst_function::handle_dwarf(Dwarf_Die* d)
 {
 	die = d;
@@ -282,7 +337,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	unw_word_t sp;
 	unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp);
 
-    ctx->log(SEVERITY_INFO, "Found function in debug info. name = %s(...), PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, stack address: 0x%lX",
+    ctx->log(SEVERITY_DEBUG, "Found function in debug info. name = %s(...), PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, stack address: 0x%lX",
     		dwarf_diename(d), pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr, sp);
 
 	// determine function's stack frame base
@@ -316,7 +371,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	pst_parameter ret_p(ctx); ret_p.is_return = true;
 	attr = dwarf_attr(die, DW_AT_type, &attr_mem);
 	if(attr) {
-		ctx->log(SEVERITY_INFO, "Handle return parameter");
+		ctx->log(SEVERITY_DEBUG, "Handle return parameter");
 		if(ret_p.handle_type(attr, true)) {
 			params.push_back(ret_p);
 		}
@@ -491,9 +546,14 @@ bool __pst_handler::get_dwarf_function(pst_function& fun)
 	return nret;
 }
 
-void __pst_handler::dwarf_print()
+void __pst_handler::print_dwarf()
 {
-
+    ctx.offset = 0;
+    ctx.print("DWARF-based stack trace information:\n");
+    for(auto function : functions) {
+        function.print_dwarf();
+        ctx.print("\n");
+    }
 }
 
 char *debuginfo_path = NULL;

@@ -35,11 +35,13 @@ typedef struct __pst_parameter {
 		type = 0;
 		loc = NULL;
 		is_return = false;
+		is_variable = false;
 		value = 0;
 	}
 
 	bool handle_dwarf(Dwarf_Die* d);
 	bool handle_type(Dwarf_Attribute* param, bool is_return = false);
+	bool print_dwarf();
 
 	Dwarf_Die*					die; 	// DWARF DIE containing parameter's definition
 	std::string					name;	// parameter's name
@@ -48,6 +50,7 @@ typedef struct __pst_parameter {
 	std::vector<std::string>	types;	// list of parameter's definitions i.e. 'typedef', 'uint32_t'
 	void*						loc;	// pointer to location of parameter's value
 	bool						is_return; // whether this parameter is return value of the function
+	bool                        is_variable;// whether this parameter is function variable or argument of function
 	uint64_t					value;	// value of parameter
 	pst_context*				ctx;
 } pst_parameter;
@@ -66,6 +69,7 @@ typedef struct __pst_function {
 
 	bool unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr);
 	bool handle_dwarf(Dwarf_Die* d);
+	bool print_dwarf();
 
 	Dwarf_Addr					lowpc;
 	Dwarf_Addr					highpc;
@@ -97,7 +101,7 @@ typedef struct __pst_handler {
 	}
 
 
-	void dwarf_print();
+	void print_dwarf();
 	bool unwind();
 	bool get_frame();
 	bool get_dwarf_function(pst_function& fun);

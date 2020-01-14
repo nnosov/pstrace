@@ -71,7 +71,9 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     }
 
 	if(trace) {
-	    logger->Log(SEVERITY_DEBUG, "%s", handler.ctx.buff);
+	    logger->Log(SEVERITY_INFO, "%s", handler.ctx.buff);
+	    handler.print_dwarf();
+	    logger->Log(SEVERITY_INFO, "%s", handler.ctx.buff);
 	} else {
 	    logger->Log(SEVERITY_ERROR, "No stack trace obtained");
 	}
@@ -191,7 +193,7 @@ void ResetSignalHandler() {
 
 int main(int argc, char* argv[])
 {
-
+    logger->SetCurrentSeverity(SEVERITY_INFO);
     SetSignalHandler(SigusrHandler);
 
     Fun1(1, DEF_2, 5);
