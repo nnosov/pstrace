@@ -180,6 +180,27 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 	return offset;
 }
 
+bool __pst_context::get_value(uint64_t& value)
+{
+    if(!stack.Size()) {
+        return false;
+    }
+
+    value = 0;
+    dwarf_value* v = stack.get();
+    v->get_uint(value);
+    if(v->type & DWARF_TYPE_REGISTER_LOC) {
+        // dereference register location
+        uint64_t regno = value;
+        if(unw_get_reg(&cursor, regno, &value)) {
+            log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr)
 {
     stack.clear();
@@ -217,6 +238,7 @@ bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
                         log(SEVERITY_ERROR, "Failed to calculate sub-expression for operation %s(0x%lX, 0x%lX)", map->op_name, exprs[i].number, exprs[i].number2);
                         return false;
                     }
+                    continue;
                 } else {
                     log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
                 }
@@ -230,25 +252,6 @@ bool __pst_context::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
             return false;
         }
 
-    }
-
-    if(stack.Size()) {
-        unw_word_t value = 0;
-        dwarf_value* v = stack.get();
-        v->get_uint(value);
-        if(v->type & DWARF_TYPE_REGISTER_LOC) {
-            // dereference register location
-            uint64_t regno = value;
-            if(unw_get_reg(&cursor, regno, &value)) {
-                log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
-                return false;
-            }
-        }
-        log(SEVERITY_INFO, "Found 0x%X value of location expression", value);
-        return true;
-    } else {
-        log(SEVERITY_ERROR, "No value found for location expression");
-        return false;
     }
 
     return true;

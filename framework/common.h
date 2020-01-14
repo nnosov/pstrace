@@ -115,6 +115,7 @@ typedef struct __pst_context {
 	void log(SC_LogSeverity severity, const char*fmt, ...);
 	uint32_t print_expr_block(Dwarf_Op *exprs, int len, char* buff, uint32_t buff_size, Dwarf_Attribute* attr = 0);
 	bool calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr);
+	bool get_value(uint64_t& value);
 
 	ucontext_t*					hcontext;	// context of signal handler
 	unw_context_t				context;	// context of stack trace
