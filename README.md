@@ -80,7 +80,7 @@ disassemble executable
 
 [DWARF 5 Standard (DWARF comittee)](http://www.dwarfstd.org/doc/DWARF5.pdf)
 
-[Introduction to the DWARF Debugging Format (DWARF comittee)]([http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf](http://www.dwarfstd.org/doc/Debugging using DWARF-2012.pdf))
+[Introduction to the DWARF Debugging Format (DWARF comittee)](http://www.dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf)
 
 [Exception handling (DWARF wiki)](http://wiki.dwarfstd.org/index.php?title=Exception_Handling)
 
