@@ -723,10 +723,11 @@ bool __pst_handler::get_dwarf_function(pst_function* fun)
 {
     Dwarf_Addr mod_cu = 0;
     // get CU(Compilation Unit) debug definition
-    Dwarf_Die* cdie = dwfl_module_addrdie(module, addr, &mod_cu);
+    module = dwfl_addrmodule(dwfl, fun->pc);
+    Dwarf_Die* cdie = dwfl_module_addrdie(module, fun->pc, &mod_cu);
     //Dwarf_Die* cdie = dwfl_addrdie(dwfl, addr, &mod_bias);
     if(!cdie) {
-    	ctx.log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", addr);
+    	ctx.log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", fun->pc);
     	return false;
     }
 
@@ -746,6 +747,7 @@ bool __pst_handler::get_dwarf_function(pst_function* fun)
 	do {
 		int tag = dwarf_tag(&result);
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
+		    //ctx.log(SEVERITY_DEBUG, "function die name %s", dwarf_diename(&result));
 			if(!strcmp(fun->name.c_str(), dwarf_diename(&result))) {
 				return fun->handle_dwarf(&result);
 			}
@@ -791,7 +793,12 @@ pst_function* __pst_handler::next_function(pst_function* f)
 
 bool __pst_handler::handle_dwarf()
 {
+    Dl_info info;
+
     for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
+        dladdr((void*)(fun->pc), &info);
+        ctx.base_addr = (uint64_t)info.dli_fbase;
+
         ctx.curr_frame = fun->cursor;
         if(fun->parent) {
             ctx.next_frame = fun->parent->cursor;
@@ -848,11 +855,11 @@ bool __pst_handler::unwind()
 #endif
     ctx.offset = 0;
 
-    handle = dlopen(NULL, RTLD_NOW);
+    //handle = dlopen(NULL, RTLD_NOW);
 	Dl_info info;
 	dladdr(caller, &info);
 	ctx.base_addr = (uint64_t)info.dli_fbase;
-	ctx.log(SEVERITY_INFO, "Process address information: base address: %p, object name: %s", info.dli_fbase, info.dli_fname);
+	ctx.log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
 
     int skipped = 0;
 #ifndef USE_LIBUNWIND
