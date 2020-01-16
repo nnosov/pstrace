@@ -65,15 +65,16 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     fatal_error_in_progress = 1;
 
     logger->Log(SEVERITY_ERROR, "%s signal handled", strsignal(sig));
-    bool trace = false;
+    bool ret = false;
     pst_handler handler((ucontext_t*)context);
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    trace = handler.unwind();
+	    ret = handler.unwind();
     }
 
-	if(trace) {
+	if(ret) {
 	    logger->Log(SEVERITY_INFO, "%s", handler.ctx.buff);
+	    handler.handle_dwarf();
 	    handler.print_dwarf();
 	    logger->Log(SEVERITY_INFO, "%s", handler.ctx.buff);
 	} else {
