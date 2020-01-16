@@ -84,6 +84,12 @@ disassemble executable
 
 [Exception handling (DWARF wiki)](http://wiki.dwarfstd.org/index.php?title=Exception_Handling)
 
+[Expression Operator For Constants (DWARF Wiki)](http://wiki.dwarfstd.org/index.php?title=Expression_Operator_For_Constants)
+
+[Very informative discussion on dwarf mailing lists about DW_OP_regX vs. DW_OP_bregX 0 ](http://lists.dwarfstd.org/pipermail/dwarf-discuss-dwarfstd.org/2009-February/002056.html)
+
+[Very informative discussion on dwarf mailing list about Semantics of DW_OP_(b)reg](http://lists.dwarfstd.org/pipermail/dwarf-discuss-dwarfstd.org/2017-March/004335.html)
+
 [Exploring the DWARF debug format information (IBM)](https://developer.ibm.com/articles/au-dwarf-debug-format/)
 
 [DWARF: function return value types and parameter types (simple tutorial)](https://simonkagstrom.livejournal.com/51001.html)
@@ -115,6 +121,8 @@ disassemble executable
 [Where the top of the stack is on x86]()
 
 [Stack frame layout on x86-64](https://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64)
+
+[Retrieving function arguments while unwinding the stack](https://nikhilism.com/post/2019/retrieving-function-arguments-while-unwinding-the-stack/)
 
 [Deep Wizardry: Stack Unwinding (more-less helpful)](http://blog.reverberate.org/2013/05/deep-wizardry-stack-unwinding.html)
 
