@@ -1029,7 +1029,7 @@ dwarf_op_map op_map[] = {
 		{DW_OP_implicit_value,      "DW_OP_implicit_value",     dw_op_notimpl},
 		{DW_OP_stack_value,         "DW_OP_stack_value",        dw_op_stack_value},
 		// in fact, implementation is at upper layer since this operation contains sub-expression
-		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value",        dw_op_notimpl},
+		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value",        dw_op_notimpl}, // seems that it's equal to DW_OP_entry_value
 };
 
 int find_regnum(uint32_t op)
