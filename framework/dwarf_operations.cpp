@@ -96,7 +96,7 @@ bool dw_op_notimpl(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // address and whose size is the size of an address on the target machine.
 bool dw_op_addr(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    stack->push(&op1, sizeof(op1), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+    stack->push(&op1, sizeof(op1), DWARF_TYPE_GENERIC);
 	return true;
 }
 
@@ -107,10 +107,12 @@ bool dw_op_deref(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dw
 {
 	dwarf_value* value = stack->pop();
 	if(value) {
-		uint64_t v = *((uint64_t*)value->value);
-		stack->push(&v, sizeof(v), DWARF_TYPE_GENERIC);
-
-		return true;
+	    uint64_t addr;
+	    if(value->get_uint(addr)) {
+	        uint64_t v = *((uint64_t*)addr);
+	        stack->push(&v, sizeof(v), DWARF_TYPE_GENERIC);
+	        return true;
+	    }
 	}
 
 	return false;
@@ -790,7 +792,7 @@ bool dw_op_breg_x(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, D
 	}
 
 	val += off;
-	stack->push(&val, sizeof(val), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+	stack->push(&val, sizeof(val), DWARF_TYPE_REGISTER_LOC | DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -1071,6 +1073,13 @@ bool __dwarf_stack::get_value(uint64_t& value)
             ctx->log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
             return false;
         }
+    } else if(v->type & DWARF_TYPE_MEMORY_LOC) {
+        // dereference memory location
+        uint64_t addr;
+        if(!v->get_uint(addr)) {
+            return false;
+        }
+        value = *((uint64_t*)addr);
     }
 
     return true;
