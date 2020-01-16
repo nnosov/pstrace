@@ -118,7 +118,7 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 		const dwarf_op_map* map = find_op_map(exprs[i].atom);
 		if(map) {
 			if(map->op_num >= DW_OP_breg0 && map->op_num <= DW_OP_breg16) {
-				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number);
+	            int32_t off = decode_sleb128((unsigned char*)&exprs[i].number);
 				int regno = map->op_num - DW_OP_breg0;
 				unw_word_t ptr = 0;
 				unw_get_reg(&cursor, regno, &ptr);
@@ -152,23 +152,21 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 				uint32_t value = decode_uleb128((unsigned char*)&exprs[i].number);
 				offset += snprintf(buff + offset, buff_size - offset, "%s(+%u) ", map->op_name, value);
 			} else if(map->op_num == DW_OP_bregx) {
-				uint32_t regno = decode_uleb128((unsigned char*)&exprs[i].number);
+	            uint32_t regno = decode_uleb128((unsigned char*)&exprs[i].number);
 				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number2);
-
 				unw_word_t ptr = 0;
 				unw_get_reg(&cursor, regno, &ptr);
 				//ptr += off;
-
 				offset += snprintf(buff + offset, buff_size - offset, "%s(%s%s%d) reg_value = 0x%lX", map->op_name, unw_regname(regno), off >= 0 ? "+" : "", off, ptr);
 			} else if(map->op_num == DW_OP_regx) {
-				int32_t reg = decode_sleb128((unsigned char*)&exprs[i].number);
+			    int32_t reg = decode_sleb128((unsigned char*)&exprs[i].number);
 
 				unw_word_t value = 0;
 				unw_get_reg(&cursor, reg, &value);
 
 				offset += snprintf(buff + offset, buff_size - offset, "%s(%s) value = 0x%lX", map->op_name, unw_regname(reg), value);
 			} else if(map->op_num == DW_OP_addr) {
-				offset += snprintf(buff + offset, buff_size - offset, "%s value = 0x%X", map->op_name, *((uint32_t*)exprs[i].number));
+				offset += snprintf(buff + offset, buff_size - offset, "%s value = %p", map->op_name, (void*)exprs[i].number);
 			} else {
 				offset += snprintf(buff + offset, buff_size - offset, "%s(0x%lX, 0x%lx) ", map->op_name, exprs[i].number, exprs[i].number2);
 			}
