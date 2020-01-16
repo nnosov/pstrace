@@ -792,7 +792,7 @@ bool dw_op_breg_x(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, D
 	}
 
 	val += off;
-	stack->push(&val, sizeof(val), DWARF_TYPE_REGISTER_LOC | DWARF_TYPE_GENERIC);
+	stack->push(&val, sizeof(val), DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -1107,7 +1107,7 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
             v->replace(&value, sizeof(value), DWARF_TYPE_GENERIC);
         }
 
-        // handle there because it contains sub-expression of a Location in callers frame
+        // handle there because it contains sub-expression of a Location in caller's frame
         if(map->op_num == DW_OP_GNU_entry_value) {
             // This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
             // simple register or DWARF expression
@@ -1116,16 +1116,32 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
                 Dwarf_Op *expr;
                 size_t exprlen;
                 if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
-                    if(!calc_expression(expr, exprlen, &attr_mem)) {
+                    // save current frame cursor
+                    unw_cursor_t cursor = ctx->curr_frame; ctx->curr_frame = ctx->next_frame;
+                    dwarf_stack st(ctx);
+                    bool eret = st.calc_expression(expr, exprlen, &attr_mem);
+                    uint64_t val;
+                    bool gret = false;
+                    if(eret) {
+                        gret = st.get_value(val);
+                    }
+                    // restore current frame cursor
+                    ctx->curr_frame = cursor;
+                    if(!eret || !gret) {
                         ctx->log(SEVERITY_ERROR, "Failed to calculate sub-expression for operation %s(0x%lX, 0x%lX)", map->op_name, exprs[i].number, exprs[i].number2);
                         return false;
                     }
+                    ctx->log(SEVERITY_DEBUG, "DW_OP_GNU_entry_value calculated from caller frame = 0x%lX", val);
+                    push(&val, sizeof(val), DWARF_TYPE_GENERIC);
+
                     continue;
                 } else {
                     ctx->log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
+                    return false;
                 }
             } else {
                 ctx->log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
+                return false;
             }
         }
 
