@@ -785,7 +785,7 @@ bool dw_op_breg_x(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, D
 	}
 
 	unw_word_t val = 0;
-	if(unw_get_reg(&stack->ctx->cursor, regno, &val)) {
+	if(unw_get_reg(&stack->ctx->curr_frame, regno, &val)) {
 		return false;
 	}
 
@@ -829,7 +829,7 @@ bool dw_op_call_frame_cfa(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Wor
 {
     // since in signal handler we are know SP value, just push it to DWARF stack
     unw_word_t sp;
-    if(unw_get_reg(&stack->ctx->cursor, UNW_REG_SP, &sp)) {
+    if(unw_get_reg(&stack->ctx->curr_frame, UNW_REG_SP, &sp)) {
         return false;
     }
 
@@ -844,7 +844,7 @@ bool dw_op_fbreg(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dw
 {
     // since in signal handler we are know SP value, just use it as DW_AT_frame_base
     unw_word_t sp;
-    if(unw_get_reg(&stack->ctx->cursor, UNW_REG_SP, &sp)) {
+    if(unw_get_reg(&stack->ctx->curr_frame, UNW_REG_SP, &sp)) {
         return false;
     }
 
@@ -1067,7 +1067,7 @@ bool __dwarf_stack::get_value(uint64_t& value)
     if(v->type & DWARF_TYPE_REGISTER_LOC) {
         // dereference register location
         uint64_t regno = value;
-        if(unw_get_reg(&ctx->cursor, regno, &value)) {
+        if(unw_get_reg(&ctx->curr_frame, regno, &value)) {
             ctx->log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
             return false;
         }
@@ -1091,7 +1091,7 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
         if(v && (v->type & DWARF_TYPE_REGISTER_LOC)) {
             unw_word_t value = 0;
             uint64_t regno = *((uint64_t*)v->value);
-            if(unw_get_reg(&ctx->cursor, regno, &value)) {
+            if(unw_get_reg(&ctx->curr_frame, regno, &value)) {
                 ctx->log(SEVERITY_ERROR, "Failed to ger value of register 0x%lX", regno);
                 return false;
             }
@@ -1107,8 +1107,6 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
                 Dwarf_Op *expr;
                 size_t exprlen;
                 if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
-                    //offset += print_expr_block (expr, exprlen, buff + offset, buff_size - offset, &attr_mem);
-                    //offset += snprintf(buff + offset, buff_size - offset, ") ");
                     if(!calc_expression(expr, exprlen, &attr_mem)) {
                         ctx->log(SEVERITY_ERROR, "Failed to calculate sub-expression for operation %s(0x%lX, 0x%lX)", map->op_name, exprs[i].number, exprs[i].number2);
                         return false;

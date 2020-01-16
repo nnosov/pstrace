@@ -301,7 +301,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	    // determine location of parameter in stack/heap or CPU registers
 	    attr = dwarf_attr(result, DW_AT_location, &attr_mem);
 	    Dwarf_Addr pc;
-	    unw_get_reg(&ctx->cursor, UNW_REG_IP,  &pc);
+	    unw_get_reg(&ctx->curr_frame, UNW_REG_IP,  &pc);
 
 	    dwarf_stack stack(ctx);
 	    char str[1024];
@@ -453,7 +453,7 @@ bool __pst_function::print_dwarf()
 bool __pst_function::handle_dwarf(Dwarf_Die* d)
 {
 	die = d;
-	ctx->cursor = cursor;
+	ctx->curr_frame = cursor;
 
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
@@ -792,6 +792,13 @@ pst_function* __pst_handler::next_function(pst_function* f)
 bool __pst_handler::handle_dwarf()
 {
     for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
+        ctx.curr_frame = fun->cursor;
+        if(fun->parent) {
+            ctx.next_frame = fun->parent->cursor;
+            ctx.has_nframe = true;
+        } else {
+            ctx.has_nframe = false;
+        }
         get_dwarf_function(fun);
     }
 
@@ -858,9 +865,9 @@ bool __pst_handler::unwind()
     unw_word_t  	pc;
 
     unw_getcontext(&ctx.context);
-    unw_init_local(&ctx.cursor, &ctx.context);
-    while (unw_step(&ctx.cursor) > 0) {
-    	unw_get_reg(&ctx.cursor, UNW_REG_IP,  &pc);
+    unw_init_local(&ctx.curr_frame, &ctx.context);
+    while (unw_step(&ctx.curr_frame) > 0) {
+    	unw_get_reg(&ctx.curr_frame, UNW_REG_IP,  &pc);
     	if(pc == (uint64_t)caller) {
     		break;
     	} else {
@@ -887,8 +894,9 @@ bool __pst_handler::unwind()
     	ctx.print("[%-2d] ", idx);
     	Dwarf_Addr addr = (uintptr_t)array[i];
 #else
+   ctx.has_nframe = false;
    for (int i = skipped, idx = 0; true ; ++i, ++idx) {
-   		unw_get_reg(&ctx.cursor, UNW_REG_IP,  &pc);
+   		unw_get_reg(&ctx.curr_frame, UNW_REG_IP,  &pc);
    		addr = pc;
    		ctx.print("[%-2d] ", idx);
 #endif
@@ -900,7 +908,7 @@ bool __pst_handler::unwind()
    		}
    		ctx.print("\n");
 #ifdef USE_LIBUNWIND
-   		if(unw_step(&ctx.cursor) <= 0) {
+   		if(unw_step(&ctx.curr_frame) <= 0) {
    			break;
    		}
 #endif

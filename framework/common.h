@@ -14,6 +14,7 @@ typedef struct __pst_context {
 		offset = 0;
 		buff[0] = 0;
 		base_addr = 0;
+		has_nframe = false;
 	}
 
 	bool print(const char* fmt, ...);
@@ -22,7 +23,9 @@ typedef struct __pst_context {
 
 	ucontext_t*					hcontext;	// context of signal handler
 	unw_context_t				context;	// context of stack trace
-	unw_cursor_t				cursor;		// currently examined frame of context
+	unw_cursor_t				curr_frame;	// currently examined frame of context
+	unw_cursor_t                next_frame; // caller frame
+	bool                        has_nframe;	// has next frame or not
 	Dwarf_Addr					base_addr;	// base address where process loaded
 
 	char						buff[8192]; // stack trace buffer

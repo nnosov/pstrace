@@ -88,7 +88,7 @@ typedef struct __pst_function : public SC_ListNode {
 		lowpc = 0;
 		highpc = 0;
 		parent = NULL;
-		cursor = _ctx->cursor;
+		cursor = _ctx->curr_frame;
 		parent = _parent;
 	}
 
