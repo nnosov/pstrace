@@ -124,7 +124,7 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 				unw_get_reg(&cursor, regno, &ptr);
 				//ptr += off;
 
-				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s%s%d) reg_value: 0x%lX ", map->op_name, unw_regname(regno), off >=0 ? "+" : "", off, ptr);
+				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s%s%d) reg_value: 0x%lX", map->op_name, unw_regname(regno), off >=0 ? "+" : "", off, ptr);
 			} else if(map->op_num >= DW_OP_reg0 && map->op_num <= DW_OP_reg16) {
 				unw_word_t value = 0;
 				int regno = map->op_num - DW_OP_reg0;
@@ -168,10 +168,10 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 			} else if(map->op_num == DW_OP_addr) {
 				offset += snprintf(buff + offset, buff_size - offset, "%s value = %p", map->op_name, (void*)exprs[i].number);
 			} else {
-				offset += snprintf(buff + offset, buff_size - offset, "%s(0x%lX, 0x%lx) ", map->op_name, exprs[i].number, exprs[i].number2);
+				offset += snprintf(buff + offset, buff_size - offset, "%s(0x%lX, 0x%lx)", map->op_name, exprs[i].number, exprs[i].number2);
 			}
 		} else {
-			offset += snprintf(buff + offset, buff_size - offset, "0x%hhX(0x%lX, 0x%lx) ", exprs[i].atom, exprs[i].number, exprs[i].number2);
+			offset += snprintf(buff + offset, buff_size - offset, "0x%hhX(0x%lX, 0x%lx)", exprs[i].atom, exprs[i].number, exprs[i].number2);
 		}
 	}
 

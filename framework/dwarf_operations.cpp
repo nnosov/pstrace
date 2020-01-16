@@ -1098,7 +1098,7 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
             v->replace(&value, sizeof(value), DWARF_TYPE_GENERIC);
         }
 
-        // handle there because it contains sub-expression of Location
+        // handle there because it contains sub-expression of a Location in callers frame
         if(map->op_num == DW_OP_GNU_entry_value) {
             // This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
             // simple register or DWARF expression
