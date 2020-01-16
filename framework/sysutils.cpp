@@ -19,9 +19,9 @@
 #include "sysutils.h"
 #include "logger/log.h"
 
-#define USEI_LIBUNWIND
+#define USE_LIBUNWIND
 
-#ifdef USEI_LIBUNWIND
+#ifdef USE_LIBUNWIND
 #include <libunwind.h>
 #endif
 
@@ -396,9 +396,31 @@ pst_parameter* __pst_function::next_param(pst_parameter* p)
 
 bool __pst_function::print_dwarf()
 {
-    ctx->print("%s:%u: ", file.c_str(), line);
+    char* at = NULL;
+    if(!asprintf(&at, " at %s:%d (%p)", file.c_str(), line, (void*)pc)) {
+        return false;
+    }
+    if(at[4] == ':' && at[5] == '-') {
+        free(at);
+        if(!asprintf(&at, " at %p", (void*)pc)) {
+            return false;
+        }
+    }
+    //ctx->print("%s:%d: ", file.c_str(), line);
+
+    // handle return parameter and be safe if function haven't parameters (for example, dwar info for function is absent)
+    pst_parameter* param = next_param(NULL);
+    if(param && param->is_return) {
+        // print return value type, function name and start list of parameters
+        param->print_dwarf();
+        ctx->print(" %s(", name.c_str());
+        param = next_param(param);
+    } else {
+        ctx->print("%s(", name.c_str());
+    }
+
     bool first = true; bool start_variable = false;
-    for(pst_parameter* param = next_param(NULL); param; param = next_param(param)) {
+    for(; param; param = next_param(param)) {
         if(param->is_return) {
             // print return value type, function name and start list of parameters
             param->print_dwarf();
@@ -408,7 +430,7 @@ bool __pst_function::print_dwarf()
 
         if(param->is_variable) {
             if(!start_variable) {
-                ctx->print(")\n");
+                ctx->print(")%s\n", at);
                 ctx->print("{\n");
                 start_variable = true;
             }
@@ -430,17 +452,19 @@ bool __pst_function::print_dwarf()
     }
 
     if(!start_variable) {
-        ctx->print(");\n");
+        ctx->print(");%s\n", at);
     } else {
         ctx->print("}\n");
     }
 
+    free(at);
     return true;
 }
 
 bool __pst_function::handle_dwarf(Dwarf_Die* d)
 {
 	die = d;
+	ctx->cursor = cursor;
 
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
@@ -455,9 +479,9 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 //	}
 
     unw_proc_info_t info;
-    unw_get_proc_info(&ctx->cursor, &info);
+    unw_get_proc_info(&cursor, &info);
 	unw_word_t sp;
-	unw_get_reg(&ctx->cursor, UNW_REG_SP, &sp);
+	unw_get_reg(&cursor, UNW_REG_SP, &sp);
 
     ctx->log(SEVERITY_DEBUG, "Found function in debug info. name = %s(...), PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, stack address: 0x%lX",
     		dwarf_diename(d), pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr, sp);
@@ -553,7 +577,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
                     {
                         case DW_TAG_GNU_call_site_parameter: {
                             Dwarf_Addr pc;
-                            unw_get_reg(&ctx->cursor, UNW_REG_IP,  &pc);
+                            unw_get_reg(&cursor, UNW_REG_IP,  &pc);
 
                             dwarf_stack stack(ctx); char str[1024]; uint64_t value;
                             if(dwarf_hasattr(&child, DW_AT_location)) {
@@ -562,7 +586,9 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
                                 attr = dwarf_attr(&child, DW_AT_location, &attr_mem);
                                 if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
                                     if(stack.get_value(value)) {
+                                        ctx->log(SEVERITY_DEBUG, "%s:%d", __PRETTY_FUNCTION__, __LINE__);
                                         ctx->log(SEVERITY_DEBUG, "Call site Location: %s ==> 0x%lX", str, value);
+                                        ctx->log(SEVERITY_DEBUG, "%s:%d", __PRETTY_FUNCTION__, __LINE__);
                                     }
                                 }
                             }
@@ -726,7 +752,9 @@ bool __pst_handler::get_dwarf_function(pst_function* fun)
 		int tag = dwarf_tag(&result);
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
 			if(!strcmp(fun->name.c_str(), dwarf_diename(&result))) {
+			    ctx.log(SEVERITY_DEBUG, "%s:%d", __PRETTY_FUNCTION__, __LINE__);
 				return fun->handle_dwarf(&result);
+                ctx.log(SEVERITY_DEBUG, "%s:%d", __PRETTY_FUNCTION__, __LINE__);
 			}
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
@@ -734,9 +762,9 @@ bool __pst_handler::get_dwarf_function(pst_function* fun)
 	return nret;
 }
 
-pst_function* __pst_handler::add_function()
+pst_function* __pst_handler::add_function(__pst_function* fun)
 {
-    pst_function* f = new pst_function(&ctx);
+    pst_function* f = new pst_function(&ctx, fun);
     functions.InsertLast(f);
 
     return f;
@@ -766,6 +794,15 @@ pst_function* __pst_handler::next_function(pst_function* f)
     }
 
     return next;
+}
+
+bool __pst_handler::handle_dwarf()
+{
+    for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
+        get_dwarf_function(fun);
+    }
+
+    return true;
 }
 
 void __pst_handler::print_dwarf()
@@ -809,6 +846,7 @@ bool __pst_handler::unwind()
 #else
 #   error "unknown architecture!"
 #endif
+    ctx.offset = 0;
 
     handle = dlopen(NULL, RTLD_NOW);
 	Dl_info info;
@@ -817,12 +855,12 @@ bool __pst_handler::unwind()
 	ctx.log(SEVERITY_INFO, "Process address information: base address: %p, object name: %s", info.dli_fbase, info.dli_fname);
 
     int skipped = 0;
-#ifndef USEI_LIBUNWIND
+#ifndef USE_LIBUNWIND
     int size = 0;
     void * array[50];
     size = backtrace(array, 50);
-    for(int i = 0; i < size && array[i] != caller_address; ++i, ++skipped);
-    print("Stack trace(caller = %p. Total stack frames: %d, skipped: %d):\n", caller_address, size, skipped);
+    for(int i = 0; i < size && array[i] != caller; ++i, ++skipped);
+    ctx.print("Stack trace(caller = %p. Total stack frames: %d, skipped: %d):\n", caller, size, skipped);
 #else
     unw_word_t  	pc;
 
@@ -850,9 +888,10 @@ bool __pst_handler::unwind()
     	return false;
     }
 
-#ifndef USEI_LIBUNWIND
+#ifndef USE_LIBUNWIND
     for (int i = skipped, idx = 0; i < size ; ++i, ++idx) {
-    	print("[%-2d] ", idx);
+        uint64_t pc = (uint64_t)array[i];
+    	ctx.print("[%-2d] ", idx);
     	Dwarf_Addr addr = (uintptr_t)array[i];
 #else
    for (int i = skipped, idx = 0; true ; ++i, ++idx) {
@@ -862,25 +901,17 @@ bool __pst_handler::unwind()
 #endif
    		module = dwfl_addrmodule(dwfl, addr);
    		get_frame();
-   		pst_function* fun = add_function();
-   		if(fun->unwind(dwfl, module, pc)) {
-   			if(!get_dwarf_function(fun)) {
-   			    del_function(fun);
-   			}
-   		} else {
+   		pst_function* fun = add_function(next_function(NULL)/* first element */);
+   		if(!fun->unwind(dwfl, module, pc)) {
    		    del_function(fun);
    		}
    		ctx.print("\n");
-#ifdef USEI_LIBUNWIND
+#ifdef USE_LIBUNWIND
    		if(unw_step(&ctx.cursor) <= 0) {
    			break;
    		}
 #endif
    }
-
-//   for(int op = DW_OP_breg0; op <= DW_OP_breg16; op++ ) {
-//	   printf("{0x%X, 0x%X, \"%s\"},\n", op, op - DW_OP_breg0, unw_regname(op - DW_OP_breg0));
-//   }
 
    return true;
 }

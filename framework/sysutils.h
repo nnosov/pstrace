@@ -73,7 +73,7 @@ typedef struct __pst_parameter : public SC_ListNode {
 	void*						loc;	// pointer to location of parameter's value
 	bool						is_return; // whether this parameter is return value of the function
 	bool                        is_variable;// whether this parameter is function variable or argument of function
-	bool                        has_value;
+	bool                        has_value; // whether we got value of parameter or not
 	uint64_t					value;	// value of parameter
 	pst_context*				ctx;
 } pst_parameter;
@@ -81,12 +81,15 @@ typedef struct __pst_parameter : public SC_ListNode {
 typedef struct __pst_handler pst_handler;
 
 typedef struct __pst_function : public SC_ListNode {
-	__pst_function(pst_context* ctx) : ctx(ctx) {
+	__pst_function(pst_context* _ctx, __pst_function* _parent) : ctx(_ctx) {
 		pc = 0;
 		line = -1;
 		die = NULL;
 		lowpc = 0;
 		highpc = 0;
+		parent = NULL;
+		cursor = _ctx->cursor;
+		parent = _parent;
 	}
 
 	~__pst_function() {
@@ -102,15 +105,17 @@ typedef struct __pst_function : public SC_ListNode {
 	bool handle_dwarf(Dwarf_Die* d);
 	bool print_dwarf();
 
-	Dwarf_Addr					lowpc;
-	Dwarf_Addr					highpc;
+	Dwarf_Addr					lowpc;  // start of the function
+	Dwarf_Addr					highpc; // next address after the end of the function
 	Dwarf_Die*					die; 	// DWARF DIE containing definition of the function
 	std::string					name;	// function's name
-	SC_ListHead	                params;	// array of function's parameters
-	unw_word_t  				pc;		// pointer to the start of the function
+	SC_ListHead	                params;	// function's parameters
+	unw_word_t  				pc;		// address between lowpc & highpc (plus base address offset). actually, currently executed command
+	unw_cursor_t                cursor; // copy of stack state of the function
 	int							line;	// line in code where function is defined
-	std::string					file;	// file name (DWARF Compilation Unit) where is function defined
-	pst_context*				ctx;
+	std::string					file;	// file name (DWARF Compilation Unit) where function is defined
+	pst_function*               parent; // parent function in call trace (caller)
+	pst_context*				ctx;    // context of unwinding
 } pst_function;
 
 typedef struct __pst_handler {
@@ -134,10 +139,11 @@ typedef struct __pst_handler {
 	}
 
     void clear();
-    pst_function* add_function();
+    pst_function* add_function(__pst_function* fun);
     void del_function(pst_function* f);
     pst_function* next_function(pst_function* f);
 
+    bool handle_dwarf();
 	void print_dwarf();
 	bool unwind();
 	bool get_frame();
