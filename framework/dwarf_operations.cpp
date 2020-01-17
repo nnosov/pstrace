@@ -100,22 +100,47 @@ bool dw_op_addr(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwa
 	return true;
 }
 
+// The DW_OP_deref_size operation behaves like the DW_OP_deref operation. In the DW_OP_deref_size operation, however, the size
+// in bytes of the data retrieved from the dereferenced address is specified by the single operand. This operand is a 1-byte unsigned integral constant
+// whose value may not be larger than the size of the generic type. The data
+// retrieved is zero extended to the size of an address on the target machine
+// before being pushed onto the expression stack.
+
+bool dw_op_deref_size(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
+{
+    dwarf_value* value = stack->pop();
+    if(value) {
+        uint64_t addr;
+        if(value->get_uint(addr)) {
+            uint64_t res = 0;
+            switch(op1) {
+                case 1:
+                    res = *((uint8_t*)addr);
+                    break;
+                case 2:
+                    res = *((uint16_t*)addr);
+                    break;
+                case 4:
+                    res = *((uint32_t*)addr);
+                    break;
+                case 8:
+                    res = *((uint64_t*)addr);
+                    break;
+            }
+            stack->push(&res, sizeof(res), DWARF_TYPE_GENERIC);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // The DW_ OP_deref operation pops the top stack entry and treats it as an address.
 // The popped value must have an integral type. The value retrieved from that address is pushed, and has the generic type.
 // The size of the data retrieved from the dereferenced address is the size of an address on the target machine.
 bool dw_op_deref(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	dwarf_value* value = stack->pop();
-	if(value) {
-	    uint64_t addr;
-	    if(value->get_uint(addr)) {
-	        uint64_t v = *((uint64_t*)addr);
-	        stack->push(&v, sizeof(v), DWARF_TYPE_GENERIC);
-	        return true;
-	    }
-	}
-
-	return false;
+    return dw_op_deref_size(stack, map, 4, op2);
 }
 
 // DW_OP_const1u, DW_OP_const2u, DW_OP_const4u, DW_OP_const8u. The single operand of a DW_OP_const<n>u operation provides a 1, 2, 4, or  8-byte unsigned integer constant, respectively.
@@ -1018,7 +1043,7 @@ dwarf_op_map op_map[] = {
 
 		// not implemented
 		{DW_OP_piece,               "DW_OP_piece",              dw_op_notimpl},
-		{DW_OP_deref_size,          "DW_OP_deref_size",         dw_op_notimpl},
+		{DW_OP_deref_size,          "DW_OP_deref_size",         dw_op_deref_size},
 		{DW_OP_xderef_size,         "DW_OP_xderef_size",        dw_op_notimpl},
 		{DW_OP_nop,                 "DW_OP_nop",                dw_op_notimpl},
 		{DW_OP_push_object_address, "DW_OP_push_object_address",dw_op_notimpl},
@@ -1119,6 +1144,9 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
                     // save current frame cursor
                     unw_cursor_t cursor = ctx->curr_frame; ctx->curr_frame = ctx->next_frame;
                     dwarf_stack st(ctx);
+                    char str[1024]; str[0]= 0;
+                    ctx->print_expr_block (expr, exprlen, str, sizeof(str), &attr_mem);
+                    ctx->log(SEVERITY_DEBUG, "Parent frame expression: %s", str);
                     bool eret = st.calc_expression(expr, exprlen, &attr_mem);
                     uint64_t val;
                     bool gret = false;
