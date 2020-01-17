@@ -104,6 +104,8 @@ typedef struct __pst_function : public SC_ListNode {
 	bool unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr);
 	bool handle_dwarf(Dwarf_Die* d);
 	bool print_dwarf();
+	bool handle_lexical_block(Dwarf_Die* result);
+	bool handle_call_site(Dwarf_Die* result);
 
 	Dwarf_Addr					lowpc;  // start of the function
 	Dwarf_Addr					highpc; // next address after the end of the function

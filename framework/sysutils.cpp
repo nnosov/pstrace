@@ -37,7 +37,7 @@ typedef struct __reginfo {
 		regname[0] = 0;
 		regno = -1;
 	}
-	char regname[1024];
+	char regname[32];
 	int regno;
 } reginfo;
 
@@ -57,7 +57,7 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, dwarf_stack& stack
     Dwarf_Addr offset = pc - ctx->base_addr;
 
     if(dwarf_hasform(attr, DW_FORM_exprloc)) {
-        // Location expression (exprloc form of location in DWARF terms)
+        // Location expression (exprloc class of location in DWARF terms)
         Dwarf_Op *expr;
         size_t exprlen;
         if(dwarf_getlocation(attr, &expr, &exprlen) == 0) {
@@ -67,7 +67,7 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, dwarf_stack& stack
             }
         }
     } else if(dwarf_hasform(attr, DW_FORM_sec_offset)) {
-        // Location list (loclist form of location in DWARF terms)
+        // Location list (loclist class of location in DWARF terms)
         Dwarf_Addr base, start, end;
         ptrdiff_t off = 0;
         Dwarf_Op *expr;
@@ -77,7 +77,7 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, dwarf_stack& stack
         for(int i = 0; (off = dwarf_getlocations (attr, off, &base, &start, &end, &expr, &exprlen)) > 0; ++i) {
             ctx->print_expr_block (expr, exprlen, str, strsize, attr);
             if(offset >= start && offset <= end) {
-                // actual location, try to calculate Location expression and retrieve value of parameter
+                // actual location, try to calculate Location expression
                 if(stack.calc_expression(expr, exprlen, attr)) {
                     return true;
                 }
@@ -296,7 +296,6 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 		handle_type(attr);
 	}
 
-	dwarf_stack stack(ctx);
 	if(dwarf_hasattr(result, DW_AT_location)) {
 	    // determine location of parameter in stack/heap or CPU registers
 	    attr = dwarf_attr(result, DW_AT_location, &attr_mem);
@@ -304,7 +303,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	    unw_get_reg(&ctx->curr_frame, UNW_REG_IP,  &pc);
 
 	    dwarf_stack stack(ctx);
-	    char str[1024];
+	    char str[1024]; str[0] = 0;
 	    if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
 	        if(stack.get_value(value)) {
 	            ctx->log(SEVERITY_DEBUG, "Parameter Location: %s ==> 0x%lX", str, value);
@@ -450,6 +449,146 @@ bool __pst_function::print_dwarf()
     return true;
 }
 
+bool __pst_function::handle_lexical_block(Dwarf_Die* result)
+{
+    uint64_t lowpc = 0, highpc = 0; const char* origin_name = "";
+    dwarf_lowpc(result, &lowpc);
+    dwarf_highpc(result, &lowpc);
+
+    Dwarf_Attribute attr_mem;
+    Dwarf_Die origin;
+    if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
+        origin_name = dwarf_diename(&origin);
+        Dwarf_Die child;
+        if(dwarf_child (&origin, &child) == 0) {
+            do {
+                switch (dwarf_tag (&child))
+                {
+                    case DW_TAG_variable:
+                    case DW_TAG_formal_parameter:
+                        ctx->log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
+                        break;
+                    default:
+                        break;
+                }
+            } while (dwarf_siblingof (&child, &child) == 0);
+        }
+    }
+    const char* die_name = "";
+    if(dwarf_diename(result)) {
+        die_name = dwarf_diename(result);
+    }
+    ctx->log(SEVERITY_DEBUG, "Lexical block with name '%s', tag 0x%X and origin '%s' found. lowpc = 0x%lX, highpc = 0x%lX", die_name, dwarf_tag (result), origin_name, lowpc, highpc);
+    Dwarf_Die child;
+    if(dwarf_child (result, &child) == 0) {
+        do {
+            switch (dwarf_tag (&child)) {
+                case DW_TAG_lexical_block:
+                    handle_lexical_block(&child);
+                    break;
+                case DW_TAG_variable: {
+                    pst_parameter* param = add_param();
+                    if(!param->handle_dwarf(&child)) {
+                        del_param(param);
+                    }
+                    break;
+                }
+                case DW_TAG_GNU_call_site:
+                    handle_call_site(&child);
+                    break;
+                case DW_TAG_inlined_subroutine:
+                    ctx->log(SEVERITY_DEBUG, "Skipping Lexical block tag 'DW_TAG_inlined_subroutine'");
+                    break;
+                default:
+                    ctx->log(SEVERITY_DEBUG, "Unknown Lexical block tag 0x%X", dwarf_tag(&child));
+                    break;
+            }
+        }while (dwarf_siblingof (&child, &child) == 0);
+    }
+
+    return true;
+}
+
+// DW_AT_low_pc should point to the offset from process base address which is actually PC of current function, usually.
+// further handle DW_AT_abstract_origin attribute of DW_TAG_GNU_call_site DIE to determine what DIE is referenced by it.
+// probably by invoke by:
+// Dwarf_Die *scopes;
+// int n = dwarf_getscopes_die (funcdie, &scopes); // where 'n' is the number of scopes
+// if (n <= 0) -> FAILURE
+// see handle_function() in elfutils/tests/funcscopes.c -> handle_function() -> print_vars()
+// DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
+// relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
+// get DIE of return type
+bool __pst_function::handle_call_site(Dwarf_Die* result)
+{
+    Dwarf_Die origin;
+    Dwarf_Attribute attr_mem;
+    Dwarf_Attribute* attr;
+
+    if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
+        Dwarf_Die child;
+        if(dwarf_child (&origin, &child) == 0) {
+            do {
+                switch (dwarf_tag (&child))
+                {
+                    case DW_TAG_variable:
+                    case DW_TAG_formal_parameter:
+                        ctx->log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
+                        break;
+                    default:
+                        break;
+                }
+            } while (dwarf_siblingof (&child, &child) == 0);
+        }
+    }
+    Dwarf_Die child;
+    if(dwarf_child (result, &child) == 0) {
+        do {
+            switch (dwarf_tag (&child))
+            {
+                case DW_TAG_GNU_call_site_parameter: {
+                    Dwarf_Addr pc;
+                    unw_get_reg(&cursor, UNW_REG_IP,  &pc);
+
+                    dwarf_stack stack(ctx); char str[1024]; uint64_t value;
+                    if(dwarf_hasattr(&child, DW_AT_location)) {
+                        // handle location expression here
+                        // determine location of parameter in stack/heap or CPU registers
+                        attr = dwarf_attr(&child, DW_AT_location, &attr_mem);
+                        if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
+                            if(stack.get_value(value)) {
+                                ctx->log(SEVERITY_DEBUG, "DW_TAG_GNU_call_site_parameter Location: \"%s\" ==> 0x%lX", str, value);
+                            } else {
+                                ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
+                            }
+                        } else {
+                            ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
+                        }
+                    }
+                    if(dwarf_hasattr(&child, DW_AT_GNU_call_site_value)) {
+                        // handle value expression here
+                        attr = dwarf_attr(&child, DW_AT_GNU_call_site_value, &attr_mem);
+                        if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
+                            if(stack.get_value(value)) {
+                                ctx->log(SEVERITY_DEBUG, "DW_AT_GNU_call_site_value Location:\"%s\" ==> 0x%lX", str, value);
+                            } else {
+                                ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
+                            }
+                        } else {
+                            ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        } while (dwarf_siblingof (&child, &child) == 0);
+    }
+
+    return true;
+}
+
 bool __pst_function::handle_dwarf(Dwarf_Die* d)
 {
 	die = d;
@@ -532,84 +671,19 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 			break;
 		}
 		case DW_TAG_GNU_call_site:
-		    // DW_AT_low_pc should point to the offset from process base address which is actually PC of current function, usually.
-		    // further handle DW_AT_abstract_origin attribute of DW_TAG_GNU_call_site DIE to determine what DIE is referenced by it.
-		    // probably by invoke by:
-		    // Dwarf_Die *scopes;
-		    // int n = dwarf_getscopes_die (funcdie, &scopes); // where 'n' is the number of scopes
-		    // if (n <= 0) -> FAILURE
-		    // see handle_function() in elfutils/tests/funcscopes.c -> handle_function() -> print_vars()
-		    // DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
-		    // relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
-		    // get DIE of return type
-		    Dwarf_Die origin;
-		    if(dwarf_hasattr (&result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (&result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
-		        Dwarf_Die child;
-		        if(dwarf_child (&origin, &child) == 0) {
-		            do {
-		                switch (dwarf_tag (&child))
-		                {
-		                    case DW_TAG_variable:
-		                    case DW_TAG_formal_parameter:
-		                        ctx->log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
-		                        break;
-		                    default:
-		                        break;
-		                }
-		            } while (dwarf_siblingof (&child, &child) == 0);
-		        }
-		    }
-            Dwarf_Die child;
-            if(dwarf_child (&result, &child) == 0) {
-                do {
-                    switch (dwarf_tag (&child))
-                    {
-                        case DW_TAG_GNU_call_site_parameter: {
-                            Dwarf_Addr pc;
-                            unw_get_reg(&cursor, UNW_REG_IP,  &pc);
-
-                            dwarf_stack stack(ctx); char str[1024]; uint64_t value;
-                            if(dwarf_hasattr(&child, DW_AT_location)) {
-                                // handle location expression here
-                                // determine location of parameter in stack/heap or CPU registers
-                                attr = dwarf_attr(&child, DW_AT_location, &attr_mem);
-                                if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
-                                    if(stack.get_value(value)) {
-                                        ctx->log(SEVERITY_DEBUG, "DW_TAG_GNU_call_site_parameter Location: \"%s\" ==> 0x%lX", str, value);
-                                    } else {
-                                        ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
-                                    }
-                                } else {
-                                    ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
-                                }
-                            }
-                            if(dwarf_hasattr(&child, DW_AT_GNU_call_site_value)) {
-                                // handle value expression here
-                                attr = dwarf_attr(&child, DW_AT_GNU_call_site_value, &attr_mem);
-                                if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
-                                    if(stack.get_value(value)) {
-                                        ctx->log(SEVERITY_DEBUG, "DW_AT_GNU_call_site_value Location:\"%s\" ==> 0x%lX", str, value);
-                                    } else {
-                                        ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
-                                    }
-                                } else {
-                                    ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
-                                }
-                            }
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                } while (dwarf_siblingof (&child, &child) == 0);
-            }
+		    handle_call_site(&result);
 	        break;
 
 			//				case DW_TAG_inlined_subroutine:
 			//					/* Recurse further down */
 			//					HandleFunction(&result);
 			//					break;
+		case DW_TAG_lexical_block: {
+		    handle_lexical_block(&result);
+		    break;
+		}
 		default:
+		    ctx->log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
 			break;
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
@@ -798,6 +872,7 @@ bool __pst_handler::handle_dwarf()
     for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
         dladdr((void*)(fun->pc), &info);
         ctx.base_addr = (uint64_t)info.dli_fbase;
+        ctx.log(SEVERITY_DEBUG, "Function %s(...): module name: %s, base address: %p", fun->name.c_str(), info.dli_fname, info.dli_fbase);
 
         ctx.curr_frame = fun->cursor;
         if(fun->parent) {
