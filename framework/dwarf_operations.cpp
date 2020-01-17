@@ -140,7 +140,7 @@ bool dw_op_deref_size(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op
 // The size of the data retrieved from the dereferenced address is the size of an address on the target machine.
 bool dw_op_deref(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    return dw_op_deref_size(stack, map, 4, op2);
+    return dw_op_deref_size(stack, map, 8, op2);
 }
 
 // DW_OP_const1u, DW_OP_const2u, DW_OP_const4u, DW_OP_const8u. The single operand of a DW_OP_const<n>u operation provides a 1, 2, 4, or  8-byte unsigned integer constant, respectively.
