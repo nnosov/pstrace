@@ -90,6 +90,8 @@ disassemble executable
 
 [Very informative discussion on dwarf mailing list about Semantics of DW_OP_(b)reg](http://lists.dwarfstd.org/pipermail/dwarf-discuss-dwarfstd.org/2017-March/004335.html)
 
+[DW_AT_call_site_XXX (which currently is DW_AT_GNU_call_site_XXX) explanation](http://www.dwarfstd.org/ShowIssue.php?issue=100909.2&type=open)
+
 [Exploring the DWARF debug format information (IBM)](https://developer.ibm.com/articles/au-dwarf-debug-format/)
 
 [DWARF: function return value types and parameter types (simple tutorial)](https://simonkagstrom.livejournal.com/51001.html)
