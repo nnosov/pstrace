@@ -2,3 +2,6 @@
 framework/build/
 build/
 services/manager/build/
+core
+.gdb_history
+/*.txt
