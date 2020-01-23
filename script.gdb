@@ -12,6 +12,8 @@ handle SIGSEGV nostop noprint
 b _start
 commands 1
   p $rsp
+  info frame
+  info registers
   continue
 end
 
@@ -19,6 +21,8 @@ end
 b __libc_start_main
 commands 2
   p $rsp
+  info frame
+  info registers
   continue
 end
 
@@ -26,6 +30,8 @@ end
 b main
 commands 3
   p $rsp
+  info frame
+  info registers
   continue
 end
 
@@ -33,6 +39,8 @@ end
 b Fun1
 commands 4
   p $rsp
+  info frame
+  info registers
   continue
 end
 
@@ -40,6 +48,8 @@ end
 b Fun2
 commands 5
   p $rsp
+  info frame
+  info registers
   printf "\n"
   continue
 end
