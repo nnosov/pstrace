@@ -49,7 +49,7 @@ SRC 		= $(shell find . -name '*.cpp')
 #OBJ 		= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 OBJ 		= $(BUILD_DIR)/main.o
 
-LIBS 		= -L./ -lpthread -lpq -lpqtypes -luuid -lrabbitmq -ljson-c -lcrypto -ldl -lcurl -ldw -lxml2 -lmicrohttpd -larchive -lmagic -lunwind -lunwind-x86_64
+LIBS 		= -L./ -lpthread -luuid -ldl -ldw -lunwind -lunwind-x86_64
 ATR_LIBS	= ./build/libframework.a
 
 INCS		= -I./ \
@@ -80,7 +80,7 @@ $(RESULT_DIR)/prepare.res:
 	@touch $@
 
 $(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(ATR_LIBS)
-	gcc -ggdb -O3 -o simple simple.cpp
+	gcc -ggdb -O3 -o $(BUILD_DIR)/simple simple.cpp
 	@make -C ./framework
 	@printf "Create   %-60s" $@
 	@OUT=$$($(CXX) $(COLOR) -o $@ $(OBJ) $(ATR_LIBS) $(LIBS) 2>&1); \
