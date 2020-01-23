@@ -86,6 +86,8 @@ disassemble executable
 
 [Expression Operator For Constants (DWARF Wiki)](http://wiki.dwarfstd.org/index.php?title=Expression_Operator_For_Constants)
 
+[Very  good explanation what's CFA on x86_64](https://www.corsix.org/content/cfa-rsp-x86-64)
+
 [Very informative discussion on dwarf mailing lists about DW_OP_regX vs. DW_OP_bregX 0 ](http://lists.dwarfstd.org/pipermail/dwarf-discuss-dwarfstd.org/2009-February/002056.html)
 
 [Very informative discussion on dwarf mailing list about Semantics of DW_OP_(b)reg](http://lists.dwarfstd.org/pipermail/dwarf-discuss-dwarfstd.org/2017-March/004335.html)
