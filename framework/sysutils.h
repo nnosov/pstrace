@@ -23,8 +23,6 @@
 
 #include "common.h"
 
-char* GetExecutableName(char* path, uint32_t size);
-
 typedef struct __pst_function pst_function;
 
 typedef struct __pst_type : public SC_ListNode {
@@ -43,7 +41,7 @@ typedef struct __pst_parameter : public SC_ListNode {
 		die = NULL;
 		size = 0;
 		type = 0;
-		loc = NULL;
+		enc_type = 0;
 		is_return = false;
 		is_variable = false;
 		has_value = false;
@@ -68,9 +66,9 @@ typedef struct __pst_parameter : public SC_ListNode {
 	std::string					name;	// parameter's name
 	uint32_t                    line;   // line of parameter definition
 	Dwarf_Word					size;	// size of parameter in bytes
-	int							type;	// base type of parameter in DW_TAG_XXX types enumeration
+	int							type;	// type of parameter in DW_TAG_XXX types enumeration
+	Dwarf_Word                  enc_type; // if 'type' is DW_TAG_Base_type, then 'base_type' holds DW_AT_ATE_XXX base type encoding type
 	SC_ListHead	                types;	// list of parameter's definitions i.e. 'typedef', 'uint32_t'
-	void*						loc;	// pointer to location of parameter's value
 	bool						is_return; // whether this parameter is return value of the function
 	bool                        is_variable;// whether this parameter is function variable or argument of function
 	bool                        has_value; // whether we got value of parameter or not
@@ -87,9 +85,9 @@ typedef struct __pst_function : public SC_ListNode {
 		die = NULL;
 		lowpc = 0;
 		highpc = 0;
-		parent = NULL;
-		cursor = _ctx->curr_frame;
+		memcpy(&cursor, _ctx->curr_frame, sizeof(cursor));
 		parent = _parent;
+		sp = 0;
 	}
 
 	~__pst_function() {
@@ -113,6 +111,7 @@ typedef struct __pst_function : public SC_ListNode {
 	std::string					name;	// function's name
 	SC_ListHead	                params;	// function's parameters
 	unw_word_t  				pc;		// address between lowpc & highpc (plus base address offset). actually, currently executed command
+	unw_word_t                  sp;    // SP register in function's frame
 	unw_cursor_t                cursor; // copy of stack state of the function
 	int							line;	// line in code where function is defined
 	std::string					file;	// file name (DWARF Compilation Unit) where function is defined
@@ -144,11 +143,12 @@ typedef struct __pst_handler {
     pst_function* add_function(__pst_function* fun);
     void del_function(pst_function* f);
     pst_function* next_function(pst_function* f);
+    pst_function* last_function();
 
     bool handle_dwarf();
 	void print_dwarf();
 	bool unwind();
-	bool get_frame();
+	bool get_frame(pst_function* fun);
 	bool get_dwarf_function(pst_function* fun);
 
 	pst_context					ctx;		// context of unwinding

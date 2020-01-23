@@ -121,14 +121,14 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 	            int32_t off = decode_sleb128((unsigned char*)&exprs[i].number);
 				int regno = map->op_num - DW_OP_breg0;
 				unw_word_t ptr = 0;
-				unw_get_reg(&curr_frame, regno, &ptr);
+				unw_get_reg(curr_frame, regno, &ptr);
 				//ptr += off;
 
 				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s%s%d) reg_value: 0x%lX", map->op_name, unw_regname(regno), off >=0 ? "+" : "", off, ptr);
 			} else if(map->op_num >= DW_OP_reg0 && map->op_num <= DW_OP_reg16) {
 				unw_word_t value = 0;
 				int regno = map->op_num - DW_OP_reg0;
-				unw_get_reg(&curr_frame, regno, &value);
+				unw_get_reg(curr_frame, regno, &value);
 				offset += snprintf(buff + offset, buff_size - offset, "%s(*%s) value: 0x%lX", map->op_name, unw_regname(regno), value);
 			} else if(map->op_num == DW_OP_GNU_entry_value) {
 				uint32_t value = decode_uleb128((unsigned char*)&exprs[i].number);
@@ -155,20 +155,23 @@ uint32_t __pst_context::print_expr_block (Dwarf_Op *exprs, int len, char* buff, 
 	            uint32_t regno = decode_uleb128((unsigned char*)&exprs[i].number);
 				int32_t off = decode_sleb128((unsigned char*)&exprs[i].number2);
 				unw_word_t ptr = 0;
-				unw_get_reg(&curr_frame, regno, &ptr);
+				unw_get_reg(curr_frame, regno, &ptr);
 				//ptr += off;
 				offset += snprintf(buff + offset, buff_size - offset, "%s(%s%s%d) reg_value = 0x%lX", map->op_name, unw_regname(regno), off >= 0 ? "+" : "", off, ptr);
 			} else if(map->op_num == DW_OP_regx) {
 			    int32_t reg = decode_sleb128((unsigned char*)&exprs[i].number);
 
 				unw_word_t value = 0;
-				unw_get_reg(&curr_frame, reg, &value);
+				unw_get_reg(curr_frame, reg, &value);
 
 				offset += snprintf(buff + offset, buff_size - offset, "%s(%s) value = 0x%lX", map->op_name, unw_regname(reg), value);
 			} else if(map->op_num == DW_OP_addr) {
 				offset += snprintf(buff + offset, buff_size - offset, "%s value = %p", map->op_name, (void*)exprs[i].number);
+            } else if(map->op_num == DW_OP_fbreg) {
+                int32_t off = decode_sleb128((unsigned char*)&exprs[i].number);
+                offset += snprintf(buff + offset, buff_size - offset, "%s(SP%s%d) ", map->op_name, off >=0 ? "+" : "", off);
 			} else {
-				offset += snprintf(buff + offset, buff_size - offset, "%s(0x%lX, 0x%lx)", map->op_name, exprs[i].number, exprs[i].number2);
+				offset += snprintf(buff + offset, buff_size - offset, "%s(0x%lX, 0x%lx) ", map->op_name, exprs[i].number, exprs[i].number2);
 			}
 		} else {
 			offset += snprintf(buff + offset, buff_size - offset, "0x%hhX(0x%lX, 0x%lx)", exprs[i].atom, exprs[i].number, exprs[i].number2);

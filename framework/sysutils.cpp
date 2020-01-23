@@ -192,7 +192,7 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param)
 	switch (dwarf_tag(&ret_die)) {
 		case DW_TAG_base_type: {
 			// get Size attribute and it's value
-			Dwarf_Word size = 0;
+			size = 0;
 			attr = dwarf_attr(&ret_die, DW_AT_byte_size, &attr_mem);
 			if(attr) {
 				dwarf_formudata(attr, &size);
@@ -200,6 +200,12 @@ bool __pst_parameter::handle_type(Dwarf_Attribute* param)
 			ctx->log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), size);
 			add_type(dwarf_diename(&ret_die), DW_TAG_base_type);
 			type = DW_TAG_base_type;
+
+			attr = dwarf_attr(&ret_die, DW_AT_encoding, &attr_mem);
+			if(attr) {
+			    enc_type = 0;
+			    dwarf_formudata(attr, &enc_type);
+			}
 			break;
 		}
 		case DW_TAG_array_type:
@@ -291,7 +297,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	dwarf_decl_line(result, (int*)&line);
 	// Get reference to attribute type of the parameter/variable
 	attr = dwarf_attr(result, DW_AT_type, &attr_mem);
-	ctx->log(SEVERITY_DEBUG, "Handle '%s' %s", name.c_str(), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
+	ctx->log(SEVERITY_DEBUG, "---> Handle '%s' %s", name.c_str(), dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
 	if(attr) {
 		handle_type(attr);
 	}
@@ -300,7 +306,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	    // determine location of parameter in stack/heap or CPU registers
 	    attr = dwarf_attr(result, DW_AT_location, &attr_mem);
 	    Dwarf_Addr pc;
-	    unw_get_reg(&ctx->curr_frame, UNW_REG_IP,  &pc);
+	    unw_get_reg(ctx->curr_frame, UNW_REG_IP,  &pc);
 
 	    dwarf_stack stack(ctx);
 	    char str[1024]; str[0] = 0;
@@ -320,7 +326,7 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	    switch (dwarf_whatform(attr)) {
 	        case DW_FORM_string:
 	            // do nothing for now
-	            ctx->log(SEVERITY_WARNING, "Const value form DW_FORM_string is not implemented.");
+	            ctx->log(SEVERITY_WARNING, "Const value form DW_FORM_string value = %s.", dwarf_formstring(attr));
 	            break;
 	        case DW_FORM_data1:
 	        case DW_FORM_data2:
@@ -343,7 +349,23 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	    }
 	}
 
-	//  handle DW_AT_default_value to get information about default value for DW_TAG_formal_parameter type of function
+	// Additionally handle these attributes:
+	// 1. DW_AT_default_value to get information about default value for DW_TAG_formal_parameter type of function
+	//      A DW_AT_default_value attribute for a formal parameter entry. The value of
+	//      this attribute may be a constant, or a reference to the debugging information
+	//      entry for a variable, or a reference to a debugging information entry containing a DWARF procedure
+
+	// 2. DW_AT_variable_parameter
+	//      A DW_AT_variable_parameter attribute, which is a flag, if a formal
+	//      parameter entry represents a parameter whose value in the calling function
+	//      may be modified by the callee. The absence of this attribute implies that the
+	//      parameter’s value in the calling function cannot be modified by the callee.
+
+	// 3. DW_AT_abstract_origin
+	//      In place of these omitted attributes, each concrete inlined instance entry has a DW_AT_abstract_origin attribute that may be used to obtain the
+	//      missing information (indirectly) from the associated abstract instance entry. The value of the abstract origin attribute is a reference to the associated abstract
+	//      instance entry.
+
 
 	return true;
 }
@@ -468,6 +490,7 @@ bool __pst_function::handle_lexical_block(Dwarf_Die* result)
                     case DW_TAG_formal_parameter:
                         ctx->log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
                         break;
+                    // Also handle  DW_TAG_unspecified_parameters (unknown number of arguments i.e. fun(arg1, ...);
                     default:
                         break;
                 }
@@ -525,6 +548,8 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
 
+    ctx->log(SEVERITY_DEBUG, "***** DW_TAG_GNU_call_site contents:");
+    // reference to DIE which represents callee's parameter if compiler knows where it is at compile time
     if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
         Dwarf_Die child;
         if(dwarf_child (&origin, &child) == 0) {
@@ -533,12 +558,32 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
                 {
                     case DW_TAG_variable:
                     case DW_TAG_formal_parameter:
-                        ctx->log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
+                        ctx->log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
                         break;
                     default:
                         break;
                 }
             } while (dwarf_siblingof (&child, &child) == 0);
+        }
+    }
+
+    // The call site may have a DW_AT_call_site_target attribute which is a DWARF expression.  For indirect calls or jumps where it is unknown at
+    // compile time which subprogram will be called the expression computes the address of the subprogram that will be called.
+    if(dwarf_hasattr (result, DW_AT_GNU_call_site_target)) {
+        attr = dwarf_attr(result, DW_AT_GNU_call_site_target, &attr_mem);
+        if(attr) {
+            dwarf_stack stack(ctx);
+            char str[1024]; str[0] = 0;
+            uint64_t value;
+            if(handle_location(ctx, &attr_mem, stack, pc, str, sizeof(str))) {
+                if(stack.get_value(value)) {
+                    ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %s ==> %#lX", str, (void*)value);
+                } else {
+                    ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_GNU_call_site_target expression: %s", str);
+                }
+            } else {
+                ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_GNU_call_site_target expression: %s", str);
+            }
         }
     }
     Dwarf_Die child;
@@ -551,13 +596,14 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
                     unw_get_reg(&cursor, UNW_REG_IP,  &pc);
 
                     dwarf_stack stack(ctx); char str[1024]; uint64_t value;
+                    // expression represent where calle parameter vill be stored
                     if(dwarf_hasattr(&child, DW_AT_location)) {
                         // handle location expression here
                         // determine location of parameter in stack/heap or CPU registers
                         attr = dwarf_attr(&child, DW_AT_location, &attr_mem);
                         if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
                             if(stack.get_value(value)) {
-                                ctx->log(SEVERITY_DEBUG, "DW_TAG_GNU_call_site_parameter Location: \"%s\" ==> 0x%lX", str, value);
+                                ctx->log(SEVERITY_DEBUG, "\tDW_TAG_GNU_call_site_parameter: \"%s\" ==> 0x%lX", str, value);
                             } else {
                                 ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
                             }
@@ -565,12 +611,13 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
                             ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
                         }
                     }
+                    // expression represents call parameter's value
                     if(dwarf_hasattr(&child, DW_AT_GNU_call_site_value)) {
                         // handle value expression here
                         attr = dwarf_attr(&child, DW_AT_GNU_call_site_value, &attr_mem);
                         if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
                             if(stack.get_value(value)) {
-                                ctx->log(SEVERITY_DEBUG, "DW_AT_GNU_call_site_value Location:\"%s\" ==> 0x%lX", str, value);
+                                ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", str, value);
                             } else {
                                 ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
                             }
@@ -592,7 +639,6 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
 bool __pst_function::handle_dwarf(Dwarf_Die* d)
 {
 	die = d;
-	ctx->curr_frame = cursor;
 
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
@@ -611,8 +657,9 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	unw_word_t sp;
 	unw_get_reg(&cursor, UNW_REG_SP, &sp);
 
-    ctx->log(SEVERITY_DEBUG, "=====> %s(...), PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, stack address: 0x%lX",
-    		dwarf_diename(d), pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr, sp);
+
+    ctx->log(SEVERITY_DEBUG, "=====> %s(...) parent '%s', PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, SP: 0x%lX, CFA: %#lX",
+    		dwarf_diename(d), parent?parent->name.c_str() : "none", pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr, sp, parent ? parent->sp : 0);
 
 	// determine function's stack frame base
 	attr = dwarf_attr(die, DW_AT_frame_base, &attr_mem);
@@ -646,12 +693,28 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	attr = dwarf_attr(die, DW_AT_type, &attr_mem);
 	if(attr) {
 		if(!ret_p->handle_type(attr)) {
-		    ctx->log(SEVERITY_ERROR, "Failed to handle return parameter type");
+		    ctx->log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", name.c_str());
 			del_param(ret_p);
 		}
 	} else {
 		ret_p->add_type("void", 0);
 	}
+
+	// handle and save additionally these attributes:
+	// 1. string of DW_AT_linkage_name (mangled name of program if any)
+	//      A debugging information entry may have a DW_AT_linkage_name attribute
+	//      whose value is a null-terminated string containing the object file linkage name
+	//      associated with the corresponding entity.
+
+	// 2. flag DW_AT_external attribute
+	//      A DW_AT_external attribute, which is a flag, if the name of a variable is
+	//      visible outside of its enclosing compilation unit.
+
+	// 3. A subroutine entry may contain a DW_AT_main_subprogram attribute which is
+	//      a flag whose presence indicates that the subroutine has been identified as the
+	//      starting function of the program. If more than one subprogram contains this flag,
+	//      any one of them may be the starting subroutine of the program.
+
 
 	Dwarf_Die result;
 	if(dwarf_child(die, &result) != 0)
@@ -659,32 +722,34 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 
 	// went through parameters and local variables of the function
 	do {
-
 		switch (dwarf_tag(&result)) {
-		case DW_TAG_formal_parameter:
-		case DW_TAG_variable: {
-		    pst_parameter* param = add_param();
-			if(!param->handle_dwarf(&result)) {
-				del_param(param);
-			}
+		    case DW_TAG_formal_parameter:
+		    case DW_TAG_variable: {
+		        pst_parameter* param = add_param();
+		        if(!param->handle_dwarf(&result)) {
+		            del_param(param);
+		        }
 
-			break;
-		}
-		case DW_TAG_GNU_call_site:
-		    handle_call_site(&result);
-	        break;
+		        break;
+		    }
+		    case DW_TAG_GNU_call_site:
+		        handle_call_site(&result);
+		        break;
 
-			//				case DW_TAG_inlined_subroutine:
-			//					/* Recurse further down */
-			//					HandleFunction(&result);
-			//					break;
-		case DW_TAG_lexical_block: {
-		    handle_lexical_block(&result);
-		    break;
-		}
-		default:
-		    ctx->log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
-			break;
+		        //				case DW_TAG_inlined_subroutine:
+		        //					/* Recurse further down */
+		        //					HandleFunction(&result);
+		        //					break;
+		    case DW_TAG_lexical_block: {
+		        handle_lexical_block(&result);
+		        break;
+		    }
+		    // Also handle:
+		    // DW_TAG_unspecified_parameters (unknown number of arguments i.e. fun(arg1, ...);
+		    // DW_AT_inline
+		    default:
+		        ctx->log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
+		        break;
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
 
@@ -743,7 +808,7 @@ bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
 }
 
 
-bool __pst_handler::get_frame()
+bool __pst_handler::get_frame(pst_function* fun)
 {
     // get CFI (Call Frame Information) for current module
     // from handle_cfi()
@@ -756,38 +821,75 @@ bool __pst_handler::get_frame()
     }
 
     // get frame of CFI for address
-    int result = dwarf_cfi_addrframe (cfi, addr - mod_bias, &frame);
-    if (result == 0) {
-    	// get frame information
-    	ctx.log(SEVERITY_DEBUG, "Found CFI frame for module");
-    	Dwarf_Addr start = addr;
-    	Dwarf_Addr end = addr;
-    	bool signalp;
-    	int ra_regno = dwarf_frame_info (frame, &start, &end, &signalp);
-    	if(ra_regno >= 0) {
-    		start += mod_bias;
-    		end += mod_bias;
-    	}
-    	ctx.log(SEVERITY_DEBUG, "Per '.eh_frame' info has %#" PRIx64 " => [%#" PRIx64 ", %#" PRIx64 "] in_signal = %s", addr, start, end, signalp ? "true" : "false");
-    	if (ra_regno < 0)
-    		ctx.log(SEVERITY_DEBUG, "return address register unavailable (%s)", dwarf_errmsg(0));
-    	else {
-    		reginfo info; info.regno = ra_regno;
-    		dwfl_module_register_names(module, regname_callback, &info);
-    		ctx.log(SEVERITY_DEBUG, "return address in reg%u%s ==> %s", ra_regno, signalp ? " (signal frame)" : "", info.regname);
-    	}
+    int result = dwarf_cfi_addrframe (cfi, fun->pc - mod_bias, &frame);
+    if (result != 0) {
+        ctx.log(SEVERITY_DEBUG, "Failed to find CFI frame for module");
+        return false;
+    }
 
-    	// finally get CFA (Canonical Frame Address)
-    	// Point cfa_ops to dummy to match print_detail expectations.
-    	// (nops == 0 && cfa_ops != NULL => "undefined")
-    	Dwarf_Op dummy;
-    	Dwarf_Op *cfa_ops = &dummy;
-    	size_t cfa_nops;
-    	result = dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops);
-    	char str[1024]; str[0] = 0;
-    	ctx.print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
-    	ctx.log(SEVERITY_INFO, "CFA expression: \"%s\"", str);
-    	//print_detail (result, cfa_ops, cfa_nops, mod_bias, "\tCFA ");
+    // get frame information
+    ctx.log(SEVERITY_DEBUG, "Found CFI frame for module");
+    Dwarf_Addr start = fun->pc;
+    Dwarf_Addr end = fun->pc;
+    bool signalp;
+    int ra_regno = dwarf_frame_info (frame, &start, &end, &signalp);
+    if(ra_regno >= 0) {
+        start += mod_bias;
+        end += mod_bias;
+    }
+    ctx.log(SEVERITY_DEBUG, "Per '.eh_frame' info has %#" PRIx64 " => [%#" PRIx64 ", %#" PRIx64 "] in_signal = %s", fun->pc, start, end, signalp ? "true" : "false");
+    if (ra_regno < 0)
+        ctx.log(SEVERITY_DEBUG, "return address register unavailable (%s)", dwarf_errmsg(0));
+    else {
+        reginfo info; info.regno = ra_regno;
+        dwfl_module_register_names(module, regname_callback, &info);
+        ctx.log(SEVERITY_DEBUG, "return address in reg%u%s ==> %s", ra_regno, signalp ? " (signal frame)" : "", info.regname);
+    }
+
+    // finally get CFA (Canonical Frame Address)
+    // Point cfa_ops to dummy to match print_detail expectations.
+    // (nops == 0 && cfa_ops != NULL => "undefined")
+    Dwarf_Op dummy;
+    Dwarf_Op *cfa_ops = &dummy;
+    size_t cfa_nops;
+    result = dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops);
+    char str[1024]; str[0] = 0;
+    ctx.print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
+    //    	ctx.log(SEVERITY_INFO, "CFA expression: \"%s\"", str);
+    dwarf_stack st(&ctx);
+    uint64_t v;
+    if(st.calc_expression(cfa_ops, cfa_nops, NULL) && st.get_value(v)) {
+        //ctx.sp = v;
+        ctx.log(SEVERITY_INFO, "CFA expression for function %s(...): %s ==> %#lX", fun->name.c_str(), str, v);
+    } else {
+        ctx.log(SEVERITY_ERROR, "Failed to calculate CFA expression");
+    }
+
+    Dwarf_Op ops_mem[3];
+    Dwarf_Op* ops;
+    size_t nops;
+    int regno = 0x5;
+    if(dwarf_frame_register(frame, regno, ops_mem, &ops, &nops) != -1) {
+        if(nops != 0 || ops != ops_mem) {
+            if(nops != 0 || ops != NULL) {
+                str[0] = 0;
+                ctx.print_expr_block (ops, nops, str, sizeof(str));
+                ctx.log(SEVERITY_DEBUG, "CFI register expression: %s", str);
+                st.clear();
+                if(st.calc_expression(ops, nops, NULL) && st.get_value(v)) {
+                    ctx.log(SEVERITY_DEBUG, "CFI register 0x%X expression: %s ==> %#lX", regno, str, v);
+                } else {
+                    ctx.log(SEVERITY_ERROR, "Failed to calculate register 0x%X CFI expression %s", regno, str);
+                }
+            } else {
+                ctx.log(SEVERITY_DEBUG, "CFI expression for register 0x%X is SAME VALUE", regno);
+            }
+        } else {
+            ctx.log(SEVERITY_DEBUG, "CFI expression for register 0x%X is UNDEFINED", regno);
+        }
+
+    } else {
+        ctx.log(SEVERITY_DEBUG, "Failed to get CFI expression for register 0x%X", regno);
     }
 
     return true;
@@ -831,9 +933,9 @@ bool __pst_handler::get_dwarf_function(pst_function* fun)
 	return nret;
 }
 
-pst_function* __pst_handler::add_function(__pst_function* fun)
+pst_function* __pst_handler::add_function(__pst_function* parent)
 {
-    pst_function* f = new pst_function(&ctx, fun);
+    pst_function* f = new pst_function(&ctx, parent);
     functions.InsertLast(f);
 
     return f;
@@ -865,21 +967,34 @@ pst_function* __pst_handler::next_function(pst_function* f)
     return next;
 }
 
+pst_function* __pst_handler::last_function()
+{
+    return (pst_function*)functions.Last();
+}
+
 bool __pst_handler::handle_dwarf()
 {
     Dl_info info;
 
     for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
         dladdr((void*)(fun->pc), &info);
+        module = dwfl_addrmodule(dwfl, fun->pc);
         ctx.base_addr = (uint64_t)info.dli_fbase;
-        ctx.log(SEVERITY_DEBUG, "Function %s(...): module name: %s, base address: %p", fun->name.c_str(), info.dli_fname, info.dli_fbase);
-
-        ctx.curr_frame = fun->cursor;
+        ctx.log(SEVERITY_DEBUG, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name.c_str(), info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
+        ctx.curr_frame = &fun->cursor;
+        ctx.sp = fun->sp;
+        ctx.cfa = fun->parent ? fun->parent->sp : 0;
         if(fun->parent) {
-            ctx.next_frame = fun->parent->cursor;
-            ctx.has_nframe = true;
+            ctx.next_frame = &fun->parent->cursor;
         } else {
-            ctx.has_nframe = false;
+            ctx.next_frame = 0;
+        }
+        get_frame(fun);
+
+        ctx.curr_frame = &fun->cursor;
+        ctx.next_frame = NULL;
+        if(fun->parent) {
+            ctx.next_frame = &fun->parent->cursor;
         }
         get_dwarf_function(fun);
     }
@@ -913,6 +1028,8 @@ bool __pst_handler::unwind()
 {
 #ifdef REG_RIP // x86_64
     caller = (void *) ctx.hcontext->uc_mcontext.gregs[REG_RIP];
+    ctx.sp = ctx.hcontext->uc_mcontext.gregs[REG_RSP];
+    ctx.log(SEVERITY_DEBUG, "Original caller's SP: %#lX", ctx.sp);
 #elif defined(REG_EIP) // x86_32
     caller_address = (void *) uctx->uc_mcontext.gregs[REG_EIP]);
 #elif defined(__arm__)
@@ -936,29 +1053,6 @@ bool __pst_handler::unwind()
 	ctx.base_addr = (uint64_t)info.dli_fbase;
 	ctx.log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
 
-    int skipped = 0;
-#ifndef USE_LIBUNWIND
-    int size = 0;
-    void * array[50];
-    size = backtrace(array, 50);
-    for(int i = 0; i < size && array[i] != caller; ++i, ++skipped);
-    ctx.print("Stack trace(caller = %p. Total stack frames: %d, skipped: %d):\n", caller, size, skipped);
-#else
-    unw_word_t  	pc;
-
-    unw_getcontext(&ctx.context);
-    unw_init_local(&ctx.curr_frame, &ctx.context);
-    while (unw_step(&ctx.curr_frame) > 0) {
-    	unw_get_reg(&ctx.curr_frame, UNW_REG_IP,  &pc);
-    	if(pc == (uint64_t)caller) {
-    		break;
-    	} else {
-    		++skipped;
-    	}
-    }
-    ctx.print("Stack trace(caller = %p. Skipped stack frames: %d):\n", caller, skipped);
-#endif
-
     dwfl = dwfl_begin(&callbacks);
     if(dwfl == NULL) {
     	ctx.print("Failed to initialize libdw session for parse stack frames");
@@ -970,31 +1064,45 @@ bool __pst_handler::unwind()
     	return false;
     }
 
-#ifndef USE_LIBUNWIND
-    for (int i = skipped, idx = 0; i < size ; ++i, ++idx) {
-        uint64_t pc = (uint64_t)array[i];
-    	ctx.print("[%-2d] ", idx);
-    	Dwarf_Addr addr = (uintptr_t)array[i];
-#else
-   ctx.has_nframe = false;
-   for (int i = skipped, idx = 0; true ; ++i, ++idx) {
-   		unw_get_reg(&ctx.curr_frame, UNW_REG_IP,  &pc);
-   		addr = pc;
-   		ctx.print("[%-2d] ", idx);
-#endif
-   		module = dwfl_addrmodule(dwfl, addr);
-   		get_frame();
-   		pst_function* fun = add_function(next_function(NULL)/* first element */);
-   		if(!fun->unwind(dwfl, module, pc)) {
-   		    del_function(fun);
-   		}
-   		ctx.print("\n");
-#ifdef USE_LIBUNWIND
-   		if(unw_step(&ctx.curr_frame) <= 0) {
-   			break;
-   		}
-#endif
-   }
+    ctx.print("Stack trace: caller = %p\n", caller);
+
+    unw_getcontext(&ctx.context);
+    unw_init_local(&ctx.cursor, &ctx.context);
+    ctx.curr_frame = &ctx.cursor;
+    for(int i = 0, skip = 1; unw_step(ctx.curr_frame) > 0; ++i) {
+        if(unw_get_reg(ctx.curr_frame, UNW_REG_IP,  &addr)) {
+            ctx.log(SEVERITY_DEBUG, "Failed to get IP value");
+            continue;
+        }
+        unw_word_t  sp;
+        if(unw_get_reg(ctx.curr_frame, UNW_REG_SP,  &sp)) {
+            ctx.log(SEVERITY_DEBUG, "Failed to get SP value");
+            continue;
+        }
+
+        if(addr == (uint64_t)caller) {
+            skip = 0;
+        } else if(skip) {
+            ctx.log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
+            continue;
+        }
+
+        ctx.print("[%-2d] ", i);
+        module = dwfl_addrmodule(dwfl, addr);
+        pst_function* last = last_function();
+        pst_function* fun = add_function(NULL);
+        fun->sp = sp;
+        ctx.log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
+        if(!fun->unwind(dwfl, module, addr)) {
+            del_function(fun);
+        } else {
+            if(last) {
+                last->parent = fun;
+            }
+            //get_frame(fun);
+        }
+        ctx.print("\n");
+    }
 
    return true;
 }

@@ -742,29 +742,14 @@ bool dw_op_plus_uconst(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word o
 {
 	dwarf_value* value = stack->get();
 	if(value) {
-		if(value->type != DWARF_TYPE_SIGNED && value->type != DWARF_TYPE_UNSIGNED) {
-			stack->ctx->log(SEVERITY_ERROR, "Invalid type for operation %s(%d)", map->op_name, value->type);
-			return false;
-		}
-
-		uint64_t op = decode_uleb128((unsigned char*)&op1);
-		if(value->type == DWARF_TYPE_SIGNED) {
-			int64_t v = 0;
-			if(!value->get_int(v)) {
-				stack->ctx->log(SEVERITY_ERROR, "Wrong size of stack value for operation %s(%d)", map->op_name, value->size);
-				return false;
-			}
-			v += op;
-			value->replace(&v, sizeof(v), value->type);
-		} else {
-			uint64_t v = 0;
-			if(!value->get_uint(v)) {
-				stack->ctx->log(SEVERITY_ERROR, "Wrong size of stack value for operation %s(%d)", map->op_name, value->size);
-				return false;
-			}
-			v += op;
-			value->replace(&v, sizeof(v), value->type);
-		}
+	    uint64_t op = decode_uleb128((unsigned char*)&op1);
+	    uint64_t v = 0;
+	    if(!value->get_generic(v)) {
+	        stack->ctx->log(SEVERITY_ERROR, "Wrong size of stack value for operation %s(%d)", map->op_name, value->size);
+	        return false;
+	    }
+	    v += op;
+	    value->replace(&v, sizeof(v), value->type);
 
 		return true;
 	}
@@ -812,8 +797,10 @@ bool dw_op_breg_x(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, D
 	}
 
 	unw_word_t val = 0;
-	if(unw_get_reg(&stack->ctx->curr_frame, regno, &val)) {
-		return false;
+	int ret = unw_get_reg(stack->ctx->curr_frame, regno, &val);
+	if(ret) {
+	    stack->ctx->log(SEVERITY_ERROR, "%s: Failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, regno, ret);
+	    return false;
 	}
 
 	val += off;
@@ -854,13 +841,15 @@ bool dw_op_stack_value(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word o
 // The DW_OP_call_frame_cfa operation pushes the value of the CFA, obtained from the Call Frame Information (see Section 6.4 on page 171).
 bool dw_op_call_frame_cfa(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    // since in signal handler we are know SP value, just push it to DWARF stack
-    unw_word_t sp;
-    if(unw_get_reg(&stack->ctx->curr_frame, UNW_REG_SP, &sp)) {
-        return false;
-    }
+    // since we are already know SP value, just push it to DWARF stack
+//    unw_word_t sp;
+//    int ret = unw_get_reg(stack->ctx->curr_frame, UNW_REG_SP, &sp);
+//    if(ret) {
+//        stack->ctx->log(SEVERITY_ERROR, "%s: failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, UNW_REG_SP, ret);
+//        return false;
+//    }
 
-    stack->push(&sp, sizeof(sp), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+    stack->push(&stack->ctx->cfa, sizeof(stack->ctx->cfa), /*DWARF_TYPE_MEMORY_LOC | */DWARF_TYPE_GENERIC);
 
     return true;
 }
@@ -871,10 +860,13 @@ bool dw_op_fbreg(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dw
 {
     // since in signal handler we are know SP value, just use it as DW_AT_frame_base
     unw_word_t sp;
-    if(unw_get_reg(&stack->ctx->curr_frame, UNW_REG_SP, &sp)) {
-        return false;
-    }
+//    int ret = unw_get_reg(stack->ctx->curr_frame, UNW_REG_SP, &sp);
+//    if(ret) {
+//        stack->ctx->log(SEVERITY_ERROR, "Failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, UNW_REG_SP, ret);
+//        return false;
+//    }
 
+    sp = stack->ctx->cfa;
     int64_t off = decode_sleb128((unsigned char*)&op1);
     sp += off;
 
@@ -1055,8 +1047,10 @@ dwarf_op_map op_map[] = {
 		{DW_OP_bit_piece,           "DW_OP_bit_piece",          dw_op_notimpl},
 		{DW_OP_implicit_value,      "DW_OP_implicit_value",     dw_op_notimpl},
 		{DW_OP_stack_value,         "DW_OP_stack_value",        dw_op_stack_value},
+
+		// GNU extensions
 		// in fact, implementation is at upper layer since this operation contains sub-expression
-		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value",        dw_op_notimpl}, // seems that it's equal to DW_OP_entry_value
+		{DW_OP_GNU_entry_value, "DW_OP_GNU_entry_value",        dw_op_notimpl}, // seems that it's equal to DW_OP_entry_value from DWARF 5
 };
 
 int find_regnum(uint32_t op)
@@ -1094,16 +1088,14 @@ bool __dwarf_stack::get_value(uint64_t& value)
     if(v->type & DWARF_TYPE_REGISTER_LOC) {
         // dereference register location
         uint64_t regno = value;
-        if(unw_get_reg(&ctx->curr_frame, regno, &value)) {
-            ctx->log(SEVERITY_ERROR, "Failed to get value of register 0x%lX", regno);
+        int ret = unw_get_reg(ctx->curr_frame, regno, &value);
+        if(ret) {
+            ctx->log(SEVERITY_ERROR, "Failed to get value of register 0x%X. Error: %d", __PRETTY_FUNCTION__, regno, ret);
             return false;
         }
     } else if(v->type & DWARF_TYPE_MEMORY_LOC) {
         // dereference memory location
-        uint64_t addr;
-        if(!v->get_uint(addr)) {
-            return false;
-        }
+        uint64_t addr = *(uint64_t*)v->value;
         value = *((uint64_t*)addr);
     }
 
@@ -1125,8 +1117,9 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
         if(v && (v->type & DWARF_TYPE_REGISTER_LOC)) {
             unw_word_t value = 0;
             uint64_t regno = *((uint64_t*)v->value);
-            if(unw_get_reg(&ctx->curr_frame, regno, &value)) {
-                ctx->log(SEVERITY_ERROR, "Failed to ger value of register 0x%lX", regno);
+            int ret = unw_get_reg(ctx->curr_frame, regno, &value);
+            if(ret) {
+                ctx->log(SEVERITY_ERROR, "Failed to ger value of register 0x%X. Error: %d", __PRETTY_FUNCTION__, regno, ret);
                 return false;
             }
             v->replace(&value, sizeof(value), DWARF_TYPE_GENERIC);
@@ -1142,13 +1135,13 @@ bool __dwarf_stack::calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribu
                 size_t exprlen;
                 if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
                     // save current frame cursor
-                    unw_cursor_t cursor = ctx->curr_frame; ctx->curr_frame = ctx->next_frame;
+                    unw_cursor_t* cursor = ctx->curr_frame; ctx->curr_frame = ctx->next_frame;
                     dwarf_stack st(ctx);
                     char str[1024]; str[0]= 0;
                     ctx->print_expr_block (expr, exprlen, str, sizeof(str), &attr_mem);
                     ctx->log(SEVERITY_DEBUG, "Parent frame expression: %s", str);
                     bool eret = st.calc_expression(expr, exprlen, &attr_mem);
-                    uint64_t val;
+                    uint64_t val = 0;
                     bool gret = false;
                     if(eret) {
                         gret = st.get_value(val);
