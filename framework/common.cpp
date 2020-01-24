@@ -19,6 +19,8 @@
 #include "dwarf_operations.h"
 
 extern SC_LogBase* logger;
+extern dwarf_reg_map    reg_map[];
+extern int regnum;
 
 bool dwarf_value::get_int(int64_t& v)
 {
@@ -79,6 +81,18 @@ bool dwarf_value::get_generic(uint64_t& v)
     }
 
     return true;
+}
+
+void __pst_context::print_registers(int from, int to)
+{
+    for(int i = from; i < regnum && i <= to; ++i) {
+        unw_word_t regval;
+        if(!unw_get_reg(curr_frame, reg_map[i].regno, &regval)) {
+            log(SEVERITY_DEBUG, "%s = %#lX%s", reg_map[i].regname, regval, i != to ? "," : "");
+        } else {
+            log(SEVERITY_DEBUG, "%s = <undef>", reg_map[i].regname);
+        }
+    }
 }
 
 bool __pst_context::print(const char* fmt, ...)

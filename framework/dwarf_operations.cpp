@@ -85,6 +85,8 @@ dwarf_reg_map	reg_map[] = {
     {0x1f, "XMM14", DW_OP_breg31},
 };
 
+int regnum = sizeof(reg_map) / sizeof(dwarf_reg_map);
+
 // not implemented operations
 bool dw_op_notimpl(dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
