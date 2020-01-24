@@ -599,6 +599,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
     		dwarf_diename(d), lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr);
     ctx->print_registers(0x0, 0x10);
     ctx->log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), parent ? parent->sp : 0, ctx->buff);
+    ctx->log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), ctx->buff);
 
 	// determine function's stack frame base
 	attr = dwarf_attr(die, DW_AT_frame_base, &attr_mem);
@@ -799,6 +800,7 @@ bool __pst_handler::get_frame(pst_function* fun)
     if(st.calc_expression(cfa_ops, cfa_nops, NULL) && st.get_value(v)) {
         //ctx.sp = v;
         ctx.log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fun->name.c_str(), str, v);
+        fun->cfa = v;
     } else {
         ctx.log(SEVERITY_ERROR, "Failed to calculate CFA expression");
     }
@@ -921,13 +923,14 @@ bool __pst_handler::handle_dwarf()
         ctx.log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name.c_str(), info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
         ctx.curr_frame = &fun->cursor;
         ctx.sp = fun->sp;
-        ctx.cfa = fun->parent ? fun->parent->sp : 0;
+        //ctx.cfa = fun->parent ? fun->parent->sp : 0;
         if(fun->parent) {
             ctx.next_frame = &fun->parent->cursor;
         } else {
             ctx.next_frame = 0;
         }
         get_frame(fun);
+        ctx.cfa = fun->cfa;
 
         ctx.curr_frame = &fun->cursor;
         ctx.next_frame = NULL;

@@ -88,6 +88,7 @@ typedef struct __pst_function : public SC_ListNode {
 		memcpy(&cursor, _ctx->curr_frame, sizeof(cursor));
 		parent = _parent;
 		sp = 0;
+		cfa = 0;
 	}
 
 	~__pst_function() {
@@ -112,6 +113,7 @@ typedef struct __pst_function : public SC_ListNode {
 	SC_ListHead	                params;	// function's parameters
 	unw_word_t  				pc;		// address between lowpc & highpc (plus base address offset). actually, currently executed command
 	unw_word_t                  sp;    // SP register in function's frame
+	unw_word_t                  cfa;
 	unw_cursor_t                cursor; // copy of stack state of the function
 	int							line;	// line in code where function is defined
 	std::string					file;	// file name (DWARF Compilation Unit) where function is defined
