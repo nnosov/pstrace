@@ -45,7 +45,7 @@ public:
             //print header if present
             if(Open() && mHeader.size())
             {
-                SendMessage((char*)mHeader.c_str());
+                SendMessage((char*)mHeader.c_str(), severity);
             }
         }
 
@@ -56,7 +56,7 @@ public:
         FormatString(fmt, args);
         va_end(args);
         FormatPostfix();
-        SendMessage(mString);
+        SendMessage(mString, severity);
 
         mLock.Unlock();
     }
@@ -121,7 +121,7 @@ public:
 protected:
 
     //actually sends message to the source
-    virtual void SendMessage(const char* msg) = 0;
+    virtual void SendMessage(const char* msg, SC_LogSeverity severity = SEVERITY_DEBUG) = 0;
 
     //format message prefix
     virtual void FormatPrefix(SC_LogSeverity severity);

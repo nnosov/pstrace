@@ -3,6 +3,11 @@
 
 #include "log.h"
 
+#define RED     "\e[0;31m"
+#define GREEN   "\e[0;32m"
+#define YELLOW  "\e[1;33m"
+#define NC      "\e[0m" // No Color
+
 class SC_LogConsole : public SC_LogBase {
 public:
 
@@ -21,8 +26,27 @@ public:
         return true;
     }
 protected:
-    inline virtual void SendMessage(const char* msg) {
-        fprintf(stderr, "%s", msg);
+    inline virtual void SendMessage(const char* msg, SC_LogSeverity severity) {
+        const char* color = NC;
+        switch(severity) {
+            case SEVERITY_DEBUG:
+                color = NC;
+                break;
+            case SEVERITY_ERROR:
+                color = RED;
+                break;
+            case SEVERITY_INFO:
+                color = GREEN;
+                break;
+            case SEVERITY_WARNING:
+                color = YELLOW;
+                break;
+            default:
+                color = NC;
+                break;
+        }
+
+        fprintf(stderr, "%s%s%s", color, msg, NC);
     }
 };
 

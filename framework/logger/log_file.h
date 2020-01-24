@@ -83,7 +83,7 @@ public:
 
 protected:
 
-    inline virtual void SendMessage(const char* msg)
+    inline virtual void SendMessage(const char* msg, SC_LogSeverity severity = SEVERITY_DEBUG)
     {
         if(mFile && mBytesCount < mMaxFileSize) {
             if(fputs(msg, mFile) >= 0) {
