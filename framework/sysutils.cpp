@@ -94,66 +94,6 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, dwarf_stack& stack
     return false;
 }
 
-/*
-int reginfo_callback (void *arg, int regno, const char *setname, const char *prefix, const char *regname, int bits, int type)
-{
-	reginfo* info = (reginfo*)arg;
-
-	//logger->Log(SEVERITY_DEBUG, "%s: info_reg = 0x%hhX, reg = 0x%hhX", __FUNCTION__, info->regno, regno);
-	if(info->regno == regno) {
-		snprintf(info->regname, sizeof(info->regname), "%s %s%s", setname, prefix, regname);
-		Dwarf_Op ops_mem[3];
-		Dwarf_Op* ops;
-		size_t nops;
-		int ret = dwarf_frame_register(frame, info->regno, ops_mem, &ops, &nops);
-		if(ret != 0) {
-			logger->Log(SEVERITY_DEBUG, "Failed to get CFI expression for register %s", info->regname);
-			return 0;
-		}
-		if(nops == 0 && ops == ops_mem) {
-			logger->Log(SEVERITY_DEBUG, "CFI expression for register %s is UNDEFINED", info->regname);
-			return 0;
-		}
-		if(nops == 0 && ops == NULL) {
-			logger->Log(SEVERITY_DEBUG, "CFI expression for register %s is SAME VALUE", info->regname);
-			return 0;
-		}
-		logger->Log(SEVERITY_DEBUG, "Found CFI expression for register %s, number of expressions: %d", info->regname, nops);
-		for(size_t i = 0; i < nops; ++i) {
-			logger->Log(SEVERITY_DEBUG, "\t[%d] operation: 0x%hhX, operand1: 0x%lX, operand2: 0x%lx, offset: 0x%lX", i, ops[i].atom, ops[i].number, ops[i].number2, ops[i].offset);
-		}
-	}
-
-	return 0;
-}
-*/
-
-/*
-void print_framereg(int regno)
-{
-	Dwarf_Op ops_mem[3];
-	Dwarf_Op* ops;
-	size_t nops;
-	int ret = dwarf_frame_register(frame, regno, ops_mem, &ops, &nops);
-	if(ret != 0) {
-		logger->Log(SEVERITY_DEBUG, "Failed to get CFI expression for register 0x%hhX", regno);
-		return;
-	}
-	if(nops == 0 && ops == ops_mem) {
-		logger->Log(SEVERITY_DEBUG, "CFI expression for register 0x%hhX is UNDEFINED", regno);
-		return;
-	}
-	if(nops == 0 && ops == NULL) {
-		logger->Log(SEVERITY_DEBUG, "CFI expression for register 0x%hhX is SAME VALUE", regno);
-		return;
-	}
-	logger->Log(SEVERITY_DEBUG, "Found CFI expression for register 0x%hhX, number of expressions: %d", regno, nops);
-	for(size_t i = 0; i < nops; ++i) {
-		logger->Log(SEVERITY_DEBUG, "\t[%d] operation: 0x%hhX, operand1: 0x%lX, operand2: 0x%lx, offset: 0x%lX", i, ops[i].atom, ops[i].number, ops[i].number2, ops[i].offset);
-	}
-}
-*/
-
 bool __pst_parameter::print_dwarf()
 {
     if(types.Size()) {
@@ -654,12 +594,11 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 
     unw_proc_info_t info;
     unw_get_proc_info(&cursor, &info);
-	unw_word_t sp;
-	unw_get_reg(&cursor, UNW_REG_SP, &sp);
 
-
-    ctx->log(SEVERITY_DEBUG, "=====> %s(...) parent '%s', PC = 0x%lX, LOW_PC = 0x%lX, HIGH_PC = 0x%lX, offset from base address: 0x%lX, BASE_PC = 0x%lX, offset from start of function: 0x%lX, SP: 0x%lX, CFA: %#lX",
-    		dwarf_diename(d), parent?parent->name.c_str() : "none", pc, lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr, sp, parent ? parent->sp : 0);
+    ctx->log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
+    		dwarf_diename(d), lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr);
+    ctx->print_registers(0x0, 0x10);
+    ctx->log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), parent ? parent->sp : 0, ctx->buff);
 
 	// determine function's stack frame base
 	attr = dwarf_attr(die, DW_AT_frame_base, &attr_mem);
@@ -813,8 +752,10 @@ bool __pst_handler::get_frame(pst_function* fun)
     // get CFI (Call Frame Information) for current module
     // from handle_cfi()
     Dwarf_Addr mod_bias = 0;
-    Dwarf_CFI* cfi = dwfl_module_eh_cfi(module, &mod_bias);
-    //Dwarf_CFI* cfi = dwfl_module_dwarf_cfi(module, &mod_bias);
+    Dwarf_CFI* cfi = dwfl_module_eh_cfi(module, &mod_bias); // rty .eh_cfi first
+    if(!cfi) { // then try .debug_fame second
+        cfi = dwfl_module_dwarf_cfi(module, &mod_bias);
+    }
     if(!cfi) {
     	ctx.log(SEVERITY_ERROR, "Cannot find CFI for module");
     	return false;
@@ -823,12 +764,11 @@ bool __pst_handler::get_frame(pst_function* fun)
     // get frame of CFI for address
     int result = dwarf_cfi_addrframe (cfi, fun->pc - mod_bias, &frame);
     if (result != 0) {
-        ctx.log(SEVERITY_DEBUG, "Failed to find CFI frame for module");
+        ctx.log(SEVERITY_ERROR, "Failed to find CFI frame for module");
         return false;
     }
 
-    // get frame information
-    ctx.log(SEVERITY_DEBUG, "Found CFI frame for module");
+    // get return register and PC range for function
     Dwarf_Addr start = fun->pc;
     Dwarf_Addr end = fun->pc;
     bool signalp;
@@ -836,14 +776,12 @@ bool __pst_handler::get_frame(pst_function* fun)
     if(ra_regno >= 0) {
         start += mod_bias;
         end += mod_bias;
-    }
-    ctx.log(SEVERITY_DEBUG, "Per '.eh_frame' info has %#" PRIx64 " => [%#" PRIx64 ", %#" PRIx64 "] in_signal = %s", fun->pc, start, end, signalp ? "true" : "false");
-    if (ra_regno < 0)
-        ctx.log(SEVERITY_DEBUG, "return address register unavailable (%s)", dwarf_errmsg(0));
-    else {
         reginfo info; info.regno = ra_regno;
         dwfl_module_register_names(module, regname_callback, &info);
-        ctx.log(SEVERITY_DEBUG, "return address in reg%u%s ==> %s", ra_regno, signalp ? " (signal frame)" : "", info.regname);
+        ctx.log(SEVERITY_INFO, "Function %s(...): '.eh/debug frame' info: PC range:  => [%#" PRIx64 ", %#" PRIx64 "], return register: %s, in_signal = %s",
+                fun->name.c_str(), start, end, info.regname, signalp ? "true" : "false");
+    } else {
+        ctx.log(SEVERITY_WARNING, "Return address register info unavailable (%s)", dwarf_errmsg(0));
     }
 
     // finally get CFA (Canonical Frame Address)
@@ -860,7 +798,7 @@ bool __pst_handler::get_frame(pst_function* fun)
     uint64_t v;
     if(st.calc_expression(cfa_ops, cfa_nops, NULL) && st.get_value(v)) {
         //ctx.sp = v;
-        ctx.log(SEVERITY_INFO, "CFA expression for function %s(...): %s ==> %#lX", fun->name.c_str(), str, v);
+        ctx.log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fun->name.c_str(), str, v);
     } else {
         ctx.log(SEVERITY_ERROR, "Failed to calculate CFA expression");
     }
@@ -874,7 +812,7 @@ bool __pst_handler::get_frame(pst_function* fun)
             if(nops != 0 || ops != NULL) {
                 str[0] = 0;
                 ctx.print_expr_block (ops, nops, str, sizeof(str));
-                ctx.log(SEVERITY_DEBUG, "CFI register expression: %s", str);
+                ctx.log(SEVERITY_INFO, "Function %s(...): CFI register location expression: %s", str);
                 st.clear();
                 if(st.calc_expression(ops, nops, NULL) && st.get_value(v)) {
                     ctx.log(SEVERITY_DEBUG, "CFI register 0x%X expression: %s ==> %#lX", regno, str, v);
@@ -889,7 +827,7 @@ bool __pst_handler::get_frame(pst_function* fun)
         }
 
     } else {
-        ctx.log(SEVERITY_DEBUG, "Failed to get CFI expression for register 0x%X", regno);
+        ctx.log(SEVERITY_ERROR, "Failed to get CFI expression for register 0x%X", regno);
     }
 
     return true;
@@ -980,7 +918,7 @@ bool __pst_handler::handle_dwarf()
         dladdr((void*)(fun->pc), &info);
         module = dwfl_addrmodule(dwfl, fun->pc);
         ctx.base_addr = (uint64_t)info.dli_fbase;
-        ctx.log(SEVERITY_DEBUG, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name.c_str(), info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
+        ctx.log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name.c_str(), info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
         ctx.curr_frame = &fun->cursor;
         ctx.sp = fun->sp;
         ctx.cfa = fun->parent ? fun->parent->sp : 0;

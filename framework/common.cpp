@@ -85,12 +85,13 @@ bool dwarf_value::get_generic(uint64_t& v)
 
 void __pst_context::print_registers(int from, int to)
 {
+    buff[0] = 0; offset = 0;
     for(int i = from; i < regnum && i <= to; ++i) {
         unw_word_t regval;
         if(!unw_get_reg(curr_frame, reg_map[i].regno, &regval)) {
-            log(SEVERITY_DEBUG, "%s = %#lX%s", reg_map[i].regname, regval, i != to ? "," : "");
+            print("%s: %#lX ", reg_map[i].regname, regval);
         } else {
-            log(SEVERITY_DEBUG, "%s = <undef>", reg_map[i].regname);
+            print("%s: <undef>", reg_map[i].regname);
         }
     }
 }
