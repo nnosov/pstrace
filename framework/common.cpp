@@ -83,6 +83,25 @@ bool dwarf_value::get_generic(uint64_t& v)
     return true;
 }
 
+void __pst_context::print_stack(int max, uint64_t next_cfa)
+{
+    log(SEVERITY_DEBUG, "CFA = %#lX, NEXT_CFA = %#lX, SP = %#lX", cfa, next_cfa, sp);
+    buff[0] = 0; offset = 0;
+    int i = 0;
+    if(cfa > sp) {
+        print("Args: ");
+        for(; i < max && (cfa - i) > sp; ++i) {
+            print("#%d 0x%lX ", i, *(uint64_t*)(cfa - i));
+        }
+    }
+    if((cfa - i) > next_cfa) {
+        print("Vars: ");
+        for(; i < max && (cfa - i) > next_cfa; ++i) {
+            print("#%d 0x%lX ", i, *(uint64_t*)(cfa - i));
+        }
+    }
+}
+
 void __pst_context::print_registers(int from, int to)
 {
     buff[0] = 0; offset = 0;

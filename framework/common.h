@@ -24,6 +24,7 @@ typedef struct __pst_context {
 	void log(SC_LogSeverity severity, const char*fmt, ...);
 	uint32_t print_expr_block(Dwarf_Op *exprs, int len, char* buff, uint32_t buff_size, Dwarf_Attribute* attr = 0);
 	void print_registers(int from, int to);
+	void print_stack(int max, uint64_t next_cfa);
 
 	ucontext_t*					hcontext;	// context of signal handler
 	unw_context_t				context;	// context of stack trace
