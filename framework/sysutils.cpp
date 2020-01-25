@@ -310,6 +310,94 @@ bool __pst_parameter::handle_dwarf(Dwarf_Die* result)
 	return true;
 }
 
+pst_call_site_param* __pst_call_site::add_param()
+{
+    pst_call_site_param* p = new pst_call_site_param(ctx);
+    params.InsertLast(p);
+
+    return p;
+}
+
+void __pst_call_site::del_param(pst_call_site_param* p)
+{
+    params.Remove(p);
+    delete p;
+}
+
+pst_call_site_param* __pst_call_site::next_param(pst_call_site_param* p)
+{
+    pst_call_site_param* param = NULL;
+    if(p == NULL) {
+        param = (pst_call_site_param*)params.First();
+    } else {
+        param = (pst_call_site_param*)params.Next(p);
+    }
+
+    return param;
+}
+
+bool __pst_call_site::handle_dwarf(Dwarf_Die* child)
+{
+    Dwarf_Attribute attr_mem;
+    Dwarf_Attribute* attr;
+
+    do {
+        switch(dwarf_tag(child))
+        {
+            case DW_TAG_GNU_call_site_parameter: {
+                Dwarf_Addr pc;
+                unw_get_reg(ctx->curr_frame, UNW_REG_IP,  &pc);
+
+                char str[1024];
+                // expression represent where callee parameter will be stored
+                pst_call_site_param* param = new pst_call_site_param(ctx);
+                if(dwarf_hasattr(child, DW_AT_location)) {
+                    // handle location expression here
+                    // determine location of parameter in stack/heap or CPU registers
+                    attr = dwarf_attr(child, DW_AT_location, &attr_mem);
+                    if(handle_location(ctx, attr, param->location, pc, str, sizeof(str))) {
+                        uint64_t value = 0;
+                        if(param->location.get_value(value)) {
+                            ctx->log(SEVERITY_DEBUG, "\tDW_TAG_GNU_call_site_parameter: \"%s\" ==> 0x%lX", str, value);
+                        } else {
+                            ctx->log(SEVERITY_WARNING, "Failed to get value of calculated DW_AT_location expression: %s", str);
+                        }
+                    } else {
+                        ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
+                        del_param(param);
+                        return false;
+                    }
+                }
+
+                // expression represents call parameter's value
+                if(dwarf_hasattr(child, DW_AT_GNU_call_site_value)) {
+                    // handle value expression here
+                    attr = dwarf_attr(child, DW_AT_GNU_call_site_value, &attr_mem);
+                    dwarf_stack stack(ctx);
+                    if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
+                        if(stack.get_value(param->value)) {
+                            ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", str, param->value);
+                        } else {
+                            ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
+                            del_param(param);
+                            return false;
+                        }
+                    } else {
+                        ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
+                        del_param(param);
+                        return false;
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    } while (dwarf_siblingof (child, child) == 0);
+
+    return true;
+}
+
 pst_parameter* __pst_function::add_param()
 {
     pst_parameter* p = new pst_parameter(ctx);
@@ -342,6 +430,55 @@ pst_parameter* __pst_function::next_param(pst_parameter* p)
     }
 
     return next;
+}
+
+pst_call_site* __pst_function::add_call_site(uint64_t target, const char* origin)
+{
+    pst_call_site* st = new pst_call_site(ctx, target, origin);
+    call_sites.InsertLast(st);
+    if(target) {
+        mCallStToTarget.Insert(&target, sizeof(target), st);
+    }
+
+    if(origin) {
+        mCallStToOrigin.Insert(origin, strlen(origin), st);
+    }
+
+    return st;
+}
+void __pst_function::del_call_site(pst_call_site* st)
+{
+    call_sites.Remove(st);
+    if(st->target && mCallStToTarget.Lookup(&st->target, sizeof(st->target))) {
+        mCallStToTarget.Remove();
+    }
+
+    if(st->origin && mCallStToTarget.Lookup(st->origin, strlen(st->origin))) {
+        mCallStToTarget.Remove();
+    }
+
+    delete st;
+}
+pst_call_site* __pst_function::next_call_site(pst_call_site* st)
+{
+    pst_call_site* next = NULL;
+    if(st) {
+        next = (pst_call_site*)call_sites.First();
+    } else {
+        next = (pst_call_site*)call_sites.Next(st);
+    }
+
+    return next;
+}
+
+pst_call_site* __pst_function::call_site_by_origin(const char* origin)
+{
+    return (pst_call_site*)mCallStToOrigin.Lookup(origin, strlen(origin));
+}
+
+pst_call_site* __pst_function::call_site_by_target(uint64_t target)
+{
+    return (pst_call_site*)mCallStToTarget.Lookup(&target, sizeof(target));
 }
 
 bool __pst_function::print_dwarf()
@@ -490,87 +627,46 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
 
     ctx->log(SEVERITY_DEBUG, "***** DW_TAG_GNU_call_site contents:");
     // reference to DIE which represents callee's parameter if compiler knows where it is at compile time
+    const char* oname = NULL;
     if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
-        Dwarf_Die child;
-        if(dwarf_child (&origin, &child) == 0) {
-            do {
-                switch (dwarf_tag (&child))
-                {
-                    case DW_TAG_variable:
-                    case DW_TAG_formal_parameter:
-                        ctx->log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
-                        break;
-                    default:
-                        break;
-                }
-            } while (dwarf_siblingof (&child, &child) == 0);
-        }
+        oname = dwarf_diename(&origin);
+        ctx->log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: '%s'", oname);
     }
 
     // The call site may have a DW_AT_call_site_target attribute which is a DWARF expression.  For indirect calls or jumps where it is unknown at
     // compile time which subprogram will be called the expression computes the address of the subprogram that will be called.
+    uint64_t target = 0;
     if(dwarf_hasattr (result, DW_AT_GNU_call_site_target)) {
         attr = dwarf_attr(result, DW_AT_GNU_call_site_target, &attr_mem);
         if(attr) {
             dwarf_stack stack(ctx);
             char str[1024]; str[0] = 0;
-            uint64_t value;
             if(handle_location(ctx, &attr_mem, stack, pc, str, sizeof(str))) {
-                if(stack.get_value(value)) {
-                    ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %s ==> %#lX", str, (void*)value);
+                if(stack.get_value(target)) {
+                    ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %s ==> %#lX", str, (void*)target);
                 } else {
                     ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_GNU_call_site_target expression: %s", str);
+                    return false;
                 }
             } else {
                 ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_GNU_call_site_target expression: %s", str);
+                return false;
             }
         }
     }
+
+    if(target == 0 && oname == NULL) {
+        ctx->log(SEVERITY_ERROR, "Cannot determine both call-site target and origin");
+        return false;
+    }
+
     Dwarf_Die child;
     if(dwarf_child (result, &child) == 0) {
-        do {
-            switch (dwarf_tag (&child))
-            {
-                case DW_TAG_GNU_call_site_parameter: {
-                    Dwarf_Addr pc;
-                    unw_get_reg(&cursor, UNW_REG_IP,  &pc);
-
-                    dwarf_stack stack(ctx); char str[1024]; uint64_t value;
-                    // expression represent where calle parameter vill be stored
-                    if(dwarf_hasattr(&child, DW_AT_location)) {
-                        // handle location expression here
-                        // determine location of parameter in stack/heap or CPU registers
-                        attr = dwarf_attr(&child, DW_AT_location, &attr_mem);
-                        if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
-                            if(stack.get_value(value)) {
-                                ctx->log(SEVERITY_DEBUG, "\tDW_TAG_GNU_call_site_parameter: \"%s\" ==> 0x%lX", str, value);
-                            } else {
-                                ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
-                            }
-                        } else {
-                            ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
-                        }
-                    }
-                    // expression represents call parameter's value
-                    if(dwarf_hasattr(&child, DW_AT_GNU_call_site_value)) {
-                        // handle value expression here
-                        attr = dwarf_attr(&child, DW_AT_GNU_call_site_value, &attr_mem);
-                        if(handle_location(ctx, attr, stack, pc, str, sizeof(str))) {
-                            if(stack.get_value(value)) {
-                                ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", str, value);
-                            } else {
-                                ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_location expression: %s", str);
-                            }
-                        } else {
-                            ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", str);
-                        }
-                    }
-                    break;
-                }
-                default:
-                    break;
-            }
-        } while (dwarf_siblingof (&child, &child) == 0);
+        pst_call_site* st = add_call_site(target, oname);
+        if(!st->handle_dwarf(&child)) {
+            del_call_site(st);
+            return false;
+        }
     }
 
     return true;

@@ -20,8 +20,11 @@
 #include <libunwind.h>
 #include <elfutils/libdwfl.h>
 #include <dlfcn.h>
+#include <stdlib.h>
 
 #include "common.h"
+#include "dictionary.h"
+#include "dwarf_operations.h"
 
 typedef struct __pst_function pst_function;
 
@@ -76,6 +79,57 @@ typedef struct __pst_parameter : public SC_ListNode {
 	pst_context*				ctx;
 } pst_parameter;
 
+// DW_TAG_call_site_parameter
+typedef struct __pst_call_site_param : public SC_ListNode {
+    __pst_call_site_param(pst_context* ctx) : location(ctx) {
+        param = NULL; name = NULL; value = 0;
+    }
+
+    ~__pst_call_site_param() {
+        if(name) {
+            free(name); name = NULL;
+        }
+    }
+
+    Dwarf_Die*                  param;      // reference to parameter DIE in callee (DW_AT_call_parameter)
+    char*                       name;       // name of parameter if present (DW_AT_name)
+    dwarf_stack                 location;   // DWARF stack containing location expression
+    uint64_t                    value;      // parameter's value
+} pst_call_site_param;
+
+// DW_TAG_call_site
+typedef struct __pst_call_site : public SC_ListNode {
+    __pst_call_site(pst_context* c, uint64_t tgt, const char* orn) {
+        target = tgt;
+        if(orn) {
+            origin = strdup(orn);
+        } else {
+            origin = NULL;
+        }
+        die = NULL;
+        ctx = c;
+    }
+
+    ~__pst_call_site() {
+        if(origin) {
+            free(origin);
+            origin = NULL;
+        }
+    }
+
+    pst_call_site_param* add_param();
+    void del_param(pst_call_site_param* p);
+    pst_call_site_param* next_param(pst_call_site_param* p);
+
+    bool handle_dwarf(Dwarf_Die* die);
+
+    uint64_t                    target;     // pointer to callee function's (it's Low PC + base address)
+    char*                       origin;     // name of callee function
+    Dwarf_Die*                  die;        // DIE of function for which this call site has parameters
+    SC_ListHead                 params;     // list of parameters and their values
+    pst_context*                ctx;
+} pst_call_site;
+
 typedef struct __pst_handler pst_handler;
 
 typedef struct __pst_function : public SC_ListNode {
@@ -100,20 +154,32 @@ typedef struct __pst_function : public SC_ListNode {
     void del_param(pst_parameter* p);
     pst_parameter* next_param(pst_parameter* p);
 
+    pst_call_site* add_call_site(uint64_t target, const char* origin);
+    void del_call_site(pst_call_site* st);
+    pst_call_site* next_call_site(pst_call_site* st);
+    pst_call_site* call_site_by_origin(const char* origin);
+    pst_call_site* call_site_by_target(uint64_t target);
+
 	bool unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr);
 	bool handle_dwarf(Dwarf_Die* d);
 	bool print_dwarf();
 	bool handle_lexical_block(Dwarf_Die* result);
 	bool handle_call_site(Dwarf_Die* result);
 
-	Dwarf_Addr					lowpc;  // start of the function
-	Dwarf_Addr					highpc; // next address after the end of the function
+	Dwarf_Addr					lowpc;  // offset to start of the function against base address
+	Dwarf_Addr					highpc; // offset to the next address after the end of the function against base address
 	Dwarf_Die*					die; 	// DWARF DIE containing definition of the function
 	std::string					name;	// function's name
 	SC_ListHead	                params;	// function's parameters
+
+	// call-site
+	SC_ListHead                 call_sites;     // Call-Site definitions
+	SC_Dict                     mCallStToTarget; // map pointer to caller to call-site
+	SC_Dict                     mCallStToOrigin; // map caller name to call-site
+
 	unw_word_t  				pc;		// address between lowpc & highpc (plus base address offset). actually, currently executed command
-	unw_word_t                  sp;    // SP register in function's frame
-	unw_word_t                  cfa;
+	unw_word_t                  sp;     // SP register in function's frame
+	unw_word_t                  cfa;    // CFA (Canonical Frame Adress) of the function
 	unw_cursor_t                cursor; // copy of stack state of the function
 	int							line;	// line in code where function is defined
 	std::string					file;	// file name (DWARF Compilation Unit) where function is defined
