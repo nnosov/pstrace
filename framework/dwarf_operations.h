@@ -3,6 +3,17 @@
 #include <elfutils/libdwfl.h>
 
 #include "common.h"
+#include "linkedlist.h"
+
+// DWARF operation (represents our own DW_OP_XXX)
+typedef struct __pst_dwarf_op : public SC_ListNode {
+    __pst_dwarf_op(uint8_t op, uint64_t a1, uint64_t a2) {
+        operation = op; arg1 = a1; arg2 = a2;
+    }
+    uint8_t                     operation;
+    uint64_t                    arg1;
+    uint64_t                    arg2;
+} pst_dwarf_op;
 
 typedef enum {
     DWARF_TYPE_INVALID      = 0,    // no type
@@ -62,9 +73,15 @@ typedef struct __dwarf_value : public SC_ListNode {
 } dwarf_value;
 
 typedef struct __dwarf_stack : public SC_ListHead {
-    __dwarf_stack(pst_context* c) : ctx(c)
-    {
+    __dwarf_stack(pst_context* c) : ctx(c) {
         attr = NULL;
+    }
+
+    ~__dwarf_stack() {
+        for(pst_dwarf_op* op = (pst_dwarf_op*)expr.First(); op; op = (pst_dwarf_op*)expr.First()) {
+            expr.Remove(op);
+            delete op;
+        }
     }
 
     void clear() {
@@ -73,6 +90,8 @@ typedef struct __dwarf_stack : public SC_ListHead {
             delete v;
         }
     }
+
+    bool is_expr_equal(__dwarf_stack* rhs);
 
     void push(void* v, uint32_t s, int t) {
         dwarf_value* value = new dwarf_value((char*)v, s, t);
@@ -104,7 +123,8 @@ typedef struct __dwarf_stack : public SC_ListHead {
     bool calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr);
     bool get_value(uint64_t& value);
 
-    Dwarf_Attribute*    attr; // attribute which expression currently processed
+    Dwarf_Attribute*    attr;   // attribute which expression currently processed
+    SC_ListHead         expr;   // DWARF expression
     pst_context*        ctx;
 } dwarf_stack;
 
