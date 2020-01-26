@@ -4,16 +4,7 @@
 
 #include "common.h"
 #include "linkedlist.h"
-
-// DWARF operation (represents our own DW_OP_XXX)
-typedef struct __pst_dwarf_op : public SC_ListNode {
-    __pst_dwarf_op(uint8_t op, uint64_t a1, uint64_t a2) {
-        operation = op; arg1 = a1; arg2 = a2;
-    }
-    uint8_t                     operation;
-    uint64_t                    arg1;
-    uint64_t                    arg2;
-} pst_dwarf_op;
+#include "sysutils.h"
 
 typedef enum {
     DWARF_TYPE_INVALID      = 0,    // no type
@@ -120,7 +111,7 @@ typedef struct __dwarf_stack : public SC_ListHead {
         return value;
     }
 
-    bool calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr);
+    bool calc_expression(Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun = NULL);
     bool get_value(uint64_t& value);
 
     Dwarf_Attribute*    attr;   // attribute which expression currently processed

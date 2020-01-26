@@ -24,9 +24,43 @@
 
 #include "common.h"
 #include "dictionary.h"
-#include "dwarf_operations.h"
+#include "data_entry.h"
 
-typedef struct __pst_function pst_function;
+
+// DWARF operation (represents our own DW_OP_XXX)
+typedef struct __pst_dwarf_op : public SC_ListNode {
+    __pst_dwarf_op(uint8_t op, uint64_t a1, uint64_t a2) {
+        operation = op; arg1 = a1; arg2 = a2;
+    }
+    uint8_t                     operation;
+    uint64_t                    arg1;
+    uint64_t                    arg2;
+} pst_dwarf_op;
+
+typedef struct __pst_dwarf_expr : public SC_ListHead {
+    __pst_dwarf_expr() {
+        has_value = false; value = 0; offset = 0; buff[0] = 0;
+    }
+    ~__pst_dwarf_expr() {
+        clean();
+    }
+    pst_dwarf_op* add_op(uint8_t op, uint64_t arg1, uint64_t arg2);
+    pst_dwarf_op* next_op(pst_dwarf_op* op);
+    void clean();
+    void setup(Dwarf_Op* expr, size_t exprlen);
+    void set_value(uint64_t v) {
+        has_value = true;
+        value = v;
+    }
+    bool print_op(const char* fmt, ...);
+
+    bool operator== (__pst_dwarf_expr &rhs);
+
+    bool        has_value;
+    uint64_t    value;
+    char        buff[512];
+    uint16_t    offset;
+} pst_dwarf_expr;
 
 typedef struct __pst_type : public SC_ListNode {
     __pst_type(const char* n, uint32_t t) : type(t) {
@@ -38,6 +72,8 @@ typedef struct __pst_type : public SC_ListNode {
     uint32_t    type;   // DW_AT_XXX type
 } pst_type;
 
+typedef struct __pst_function pst_function;
+
 typedef struct __pst_parameter : public SC_ListNode {
 	__pst_parameter(pst_context* c) : ctx(c)
 	{
@@ -48,7 +84,6 @@ typedef struct __pst_parameter : public SC_ListNode {
 		is_return = false;
 		is_variable = false;
 		has_value = false;
-		value = 0;
 		line = 0;
 	}
 
@@ -61,7 +96,7 @@ typedef struct __pst_parameter : public SC_ListNode {
 	pst_type* add_type(const char* name, int type);
 	pst_type* next_type(pst_type* t);
 
-	bool handle_dwarf(Dwarf_Die* d);
+	bool handle_dwarf(Dwarf_Die* d, __pst_function* fun);
 	bool handle_type(Dwarf_Attribute* param);
 	bool print_dwarf();
 
@@ -75,13 +110,13 @@ typedef struct __pst_parameter : public SC_ListNode {
 	bool						is_return; // whether this parameter is return value of the function
 	bool                        is_variable;// whether this parameter is function variable or argument of function
 	bool                        has_value; // whether we got value of parameter or not
-	uint64_t					value;	// value of parameter
+	pst_dwarf_expr              location;
 	pst_context*				ctx;
 } pst_parameter;
 
 // DW_TAG_call_site_parameter
 typedef struct __pst_call_site_param : public SC_ListNode {
-    __pst_call_site_param(pst_context* ctx) : location(ctx) {
+    __pst_call_site_param(pst_context* ctx) {
         param = NULL; name = NULL; value = 0;
     }
 
@@ -91,9 +126,11 @@ typedef struct __pst_call_site_param : public SC_ListNode {
         }
     }
 
+    void set_location(Dwarf_Op* expr, size_t exprlen);
+
     Dwarf_Die*                  param;      // reference to parameter DIE in callee (DW_AT_call_parameter)
     char*                       name;       // name of parameter if present (DW_AT_name)
-    dwarf_stack                 location;   // DWARF stack containing location expression
+    pst_dwarf_expr              location;   // DWARF stack containing location expression
     uint64_t                    value;      // parameter's value
 } pst_call_site_param;
 
@@ -120,6 +157,7 @@ typedef struct __pst_call_site : public SC_ListNode {
     pst_call_site_param* add_param();
     void del_param(pst_call_site_param* p);
     pst_call_site_param* next_param(pst_call_site_param* p);
+    pst_call_site_param* find_param(pst_dwarf_expr& expr);
 
     bool handle_dwarf(Dwarf_Die* die);
 
@@ -129,8 +167,6 @@ typedef struct __pst_call_site : public SC_ListNode {
     SC_ListHead                 params;     // list of parameters and their values
     pst_context*                ctx;
 } pst_call_site;
-
-typedef struct __pst_handler pst_handler;
 
 typedef struct __pst_function : public SC_ListNode {
 	__pst_function(pst_context* _ctx, __pst_function* _parent) : ctx(_ctx) {
@@ -165,6 +201,7 @@ typedef struct __pst_function : public SC_ListNode {
 	bool print_dwarf();
 	bool handle_lexical_block(Dwarf_Die* result);
 	bool handle_call_site(Dwarf_Die* result);
+	pst_call_site* find_call_site(__pst_function* callee);
 
 	Dwarf_Addr					lowpc;  // offset to start of the function against base address
 	Dwarf_Addr					highpc; // offset to the next address after the end of the function against base address
@@ -183,7 +220,7 @@ typedef struct __pst_function : public SC_ListNode {
 	unw_cursor_t                cursor; // copy of stack state of the function
 	int							line;	// line in code where function is defined
 	std::string					file;	// file name (DWARF Compilation Unit) where function is defined
-	pst_function*               parent; // parent function in call trace (caller)
+	__pst_function*             parent; // parent function in call trace (caller)
 	pst_context*				ctx;    // context of unwinding
 } pst_function;
 
