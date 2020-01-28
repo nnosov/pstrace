@@ -17,6 +17,7 @@
 #include "logger/log.h"
 #include "common.h"
 #include "dwarf_operations.h"
+#include "registers.h"
 
 extern SC_LogBase* logger;
 extern dwarf_reg_map    reg_map[];
@@ -86,7 +87,7 @@ bool dwarf_value::get_generic(uint64_t& v)
 void __pst_context::print_stack(int max, uint64_t next_cfa)
 {
     log(SEVERITY_DEBUG, "CFA = %#lX, NEXT_CFA = %#lX, SP = %#lX", cfa, next_cfa, sp);
-    buff[0] = 0; offset = 0;
+    clean_print();
     int i = 0;
     if(cfa > sp) {
         print("Args: ");
@@ -104,7 +105,7 @@ void __pst_context::print_stack(int max, uint64_t next_cfa)
 
 void __pst_context::print_registers(int from, int to)
 {
-    buff[0] = 0; offset = 0;
+    clean_print();
     for(int i = from; i < regnum && i <= to; ++i) {
         unw_word_t regval;
         if(!unw_get_reg(curr_frame, reg_map[i].regno, &regval)) {

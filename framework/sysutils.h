@@ -179,10 +179,14 @@ typedef struct __pst_function : public SC_ListNode {
 		parent = _parent;
 		sp = 0;
 		cfa = 0;
+		frame = NULL;
 	}
 
 	~__pst_function() {
 	    clear();
+	    if(frame) {
+	        free(frame);
+	    }
 	}
 
     void clear();
@@ -196,12 +200,14 @@ typedef struct __pst_function : public SC_ListNode {
     pst_call_site* call_site_by_origin(const char* origin);
     pst_call_site* call_site_by_target(uint64_t target);
 
-	bool unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr);
+	bool unwind(Dwarf_Addr addr);
 	bool handle_dwarf(Dwarf_Die* d);
 	bool print_dwarf();
 	bool handle_lexical_block(Dwarf_Die* result);
 	bool handle_call_site(Dwarf_Die* result);
 	pst_call_site* find_call_site(__pst_function* callee);
+
+	bool get_frame();
 
 	Dwarf_Addr					lowpc;  // offset to start of the function against base address
 	Dwarf_Addr					highpc; // offset to the next address after the end of the function against base address
@@ -221,6 +227,7 @@ typedef struct __pst_function : public SC_ListNode {
 	int							line;	// line in code where function is defined
 	std::string					file;	// file name (DWARF Compilation Unit) where function is defined
 	__pst_function*             parent; // parent function in call trace (caller)
+    Dwarf_Frame*                frame;  // function's stack frame
 	pst_context*				ctx;    // context of unwinding
 } pst_function;
 
@@ -228,8 +235,6 @@ typedef struct __pst_handler {
 	__pst_handler(ucontext_t* hctx) : ctx(hctx)
 	{
 		caller = NULL;
-		module = NULL;
-		dwfl = NULL;
 		frame = NULL;
 		addr = 0;
 		handle = 0;
@@ -253,14 +258,11 @@ typedef struct __pst_handler {
     bool handle_dwarf();
 	void print_dwarf();
 	bool unwind();
-	bool get_frame(pst_function* fun);
 	bool get_dwarf_function(pst_function* fun);
 
 	pst_context					ctx;		// context of unwinding
 	void*						handle;		// process handle
 	Dwarf_Addr 					addr;		// address of currently processed function
-	Dwfl* 						dwfl;		// DWARF context
-	Dwfl_Module* 				module;		// currently processed CU
 	Dwarf_Frame* 				frame;		// currently processed stack frame
 	void*						caller;		// pointer to the function which requested to unwind stack
 	SC_ListHead	                functions;	// list of functions in stack frame

@@ -767,6 +767,7 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
 bool __pst_function::handle_dwarf(Dwarf_Die* d)
 {
 	die = d;
+	get_frame();
 
 	Dwarf_Attribute attr_mem;
 	Dwarf_Attribute* attr;
@@ -786,8 +787,8 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
     ctx->log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
     		dwarf_diename(d), lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr);
     ctx->print_registers(0x0, 0x10);
-    ctx->log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), parent ? parent->sp : 0, ctx->buff);
-    ctx->log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), ctx->buff);
+    ctx->log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), parent ? parent->sp : 0, ctx->get_print());
+    ctx->log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), ctx->get_print());
 
 	// determine function's stack frame base
 	attr = dwarf_attr(die, DW_AT_frame_base, &attr_mem);
@@ -884,11 +885,11 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
 	return true;
 }
 
-bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
+bool __pst_function::unwind(Dwarf_Addr addr)
 {
 	pc = addr;
 
-	Dwfl_Line *dwline = dwfl_getsrc(dwfl, addr);
+	Dwfl_Line *dwline = dwfl_getsrc(ctx->dwfl, addr);
 	if(dwline != NULL) {
 		Dwarf_Addr addr;
 		const char* filename = dwfl_lineinfo (dwline, &addr, &line, NULL, NULL, NULL);
@@ -908,7 +909,7 @@ bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
 		ctx->print("%p", (void*)addr);
 	}
 
-	const char* addrname = dwfl_module_addrname(module, addr);
+	const char* addrname = dwfl_module_addrname(ctx->module, addr);
 	char* demangle_name = NULL;
 	if(addrname) {
 		int status;
@@ -935,42 +936,44 @@ bool __pst_function::unwind(Dwfl* dwfl, Dwfl_Module* module, Dwarf_Addr addr)
 	return true;
 }
 
-
-bool __pst_handler::get_frame(pst_function* fun)
+bool __pst_function::get_frame()
 {
     // get CFI (Call Frame Information) for current module
     // from handle_cfi()
     Dwarf_Addr mod_bias = 0;
-    Dwarf_CFI* cfi = dwfl_module_eh_cfi(module, &mod_bias); // rty .eh_cfi first
+    Dwarf_CFI* cfi = dwfl_module_eh_cfi(ctx->module, &mod_bias); // rty .eh_cfi first
     if(!cfi) { // then try .debug_fame second
-        cfi = dwfl_module_dwarf_cfi(module, &mod_bias);
+        cfi = dwfl_module_dwarf_cfi(ctx->module, &mod_bias);
     }
     if(!cfi) {
-    	ctx.log(SEVERITY_ERROR, "Cannot find CFI for module");
-    	return false;
-    }
-
-    // get frame of CFI for address
-    int result = dwarf_cfi_addrframe (cfi, fun->pc - mod_bias, &frame);
-    if (result != 0) {
-        ctx.log(SEVERITY_ERROR, "Failed to find CFI frame for module");
+        ctx->log(SEVERITY_ERROR, "Cannot find CFI for module");
         return false;
     }
 
+    // get frame of CFI for address
+    int result = dwarf_cfi_addrframe (cfi, pc - mod_bias, &frame);
+    if (result != 0) {
+        ctx->log(SEVERITY_ERROR, "Failed to find CFI frame for module");
+        return false;
+    }
+
+    // setup context to match frame
+    ctx->frame = frame;
+
     // get return register and PC range for function
-    Dwarf_Addr start = fun->pc;
-    Dwarf_Addr end = fun->pc;
+    Dwarf_Addr start = pc;
+    Dwarf_Addr end = pc;
     bool signalp;
     int ra_regno = dwarf_frame_info (frame, &start, &end, &signalp);
     if(ra_regno >= 0) {
         start += mod_bias;
         end += mod_bias;
         reginfo info; info.regno = ra_regno;
-        dwfl_module_register_names(module, regname_callback, &info);
-        ctx.log(SEVERITY_INFO, "Function %s(...): '.eh/debug frame' info: PC range:  => [%#" PRIx64 ", %#" PRIx64 "], return register: %s, in_signal = %s",
-                fun->name.c_str(), start, end, info.regname, signalp ? "true" : "false");
+        dwfl_module_register_names(ctx->module, regname_callback, &info);
+        ctx->log(SEVERITY_INFO, "Function %s(...): '.eh/debug frame' info: PC range:  => [%#" PRIx64 ", %#" PRIx64 "], return register: %s, in_signal = %s",
+                name.c_str(), start, end, info.regname, signalp ? "true" : "false");
     } else {
-        ctx.log(SEVERITY_WARNING, "Return address register info unavailable (%s)", dwarf_errmsg(0));
+        ctx->log(SEVERITY_WARNING, "Return address register info unavailable (%s)", dwarf_errmsg(0));
     }
 
     // finally get CFA (Canonical Frame Address)
@@ -979,45 +982,21 @@ bool __pst_handler::get_frame(pst_function* fun)
     Dwarf_Op dummy;
     Dwarf_Op *cfa_ops = &dummy;
     size_t cfa_nops;
-    result = dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops);
-    char str[1024]; str[0] = 0;
-    ctx.print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
-    //    	ctx.log(SEVERITY_INFO, "CFA expression: \"%s\"", str);
-    dwarf_stack st(&ctx);
-    uint64_t v;
-    if(st.calc_expression(cfa_ops, cfa_nops, NULL) && st.get_value(v)) {
-        //ctx.sp = v;
-        ctx.log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fun->name.c_str(), str, v);
-        fun->cfa = v;
-    } else {
-        ctx.log(SEVERITY_ERROR, "Failed to calculate CFA expression");
+    if(dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops)) {
+        ctx->log(SEVERITY_ERROR, "Failed to get CFA for frame");
+        return false;
     }
+    char str[1024]; str[0] = 0;
+    ctx->print_expr_block (cfa_ops, cfa_nops, str, sizeof(str));
+    dwarf_stack st(ctx);
+    if(st.calc_expression(cfa_ops, cfa_nops, NULL) && st.get_value(cfa)) {
+        //ctx.sp = v;
+        ctx->log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", name.c_str(), str, cfa);
 
-    Dwarf_Op ops_mem[3];
-    Dwarf_Op* ops;
-    size_t nops;
-    int regno = 0x5;
-    if(dwarf_frame_register(frame, regno, ops_mem, &ops, &nops) != -1) {
-        if(nops != 0 || ops != ops_mem) {
-            if(nops != 0 || ops != NULL) {
-                str[0] = 0;
-                ctx.print_expr_block (ops, nops, str, sizeof(str));
-                ctx.log(SEVERITY_INFO, "Function %s(...): CFI register location expression: %s", str);
-                st.clear();
-                if(st.calc_expression(ops, nops, NULL) && st.get_value(v)) {
-                    ctx.log(SEVERITY_DEBUG, "CFI register 0x%X expression: %s ==> %#lX", regno, str, v);
-                } else {
-                    ctx.log(SEVERITY_ERROR, "Failed to calculate register 0x%X CFI expression %s", regno, str);
-                }
-            } else {
-                ctx.log(SEVERITY_DEBUG, "CFI expression for register 0x%X is SAME VALUE", regno);
-            }
-        } else {
-            ctx.log(SEVERITY_DEBUG, "CFI expression for register 0x%X is UNDEFINED", regno);
-        }
-
+        // setup context to match CFA for frame
+        ctx->cfa = cfa;
     } else {
-        ctx.log(SEVERITY_ERROR, "Failed to get CFI expression for register 0x%X", regno);
+        ctx->log(SEVERITY_ERROR, "Failed to calculate CFA expression");
     }
 
     return true;
@@ -1027,8 +1006,8 @@ bool __pst_handler::get_dwarf_function(pst_function* fun)
 {
     Dwarf_Addr mod_cu = 0;
     // get CU(Compilation Unit) debug definition
-    module = dwfl_addrmodule(dwfl, fun->pc);
-    Dwarf_Die* cdie = dwfl_module_addrdie(module, fun->pc, &mod_cu);
+    ctx.module = dwfl_addrmodule(ctx.dwfl, fun->pc);
+    Dwarf_Die* cdie = dwfl_module_addrdie(ctx.module, fun->pc, &mod_cu);
     //Dwarf_Die* cdie = dwfl_addrdie(dwfl, addr, &mod_bias);
     if(!cdie) {
     	ctx.log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", fun->pc);
@@ -1102,12 +1081,13 @@ pst_function* __pst_handler::last_function()
 
 bool __pst_handler::handle_dwarf()
 {
+    ctx.clean_print();
     Dl_info info;
 
     //for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
     for(pst_function* fun = (pst_function*)functions.Last(); fun; fun = (pst_function*)functions.Prev(fun)) {
         dladdr((void*)(fun->pc), &info);
-        module = dwfl_addrmodule(dwfl, fun->pc);
+        ctx.module = dwfl_addrmodule(ctx.dwfl, fun->pc);
         ctx.base_addr = (uint64_t)info.dli_fbase;
         ctx.log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name.c_str(), info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
         ctx.curr_frame = &fun->cursor;
@@ -1118,7 +1098,6 @@ bool __pst_handler::handle_dwarf()
         } else {
             ctx.next_frame = 0;
         }
-        get_frame(fun);
         ctx.cfa = fun->cfa;
 
         ctx.curr_frame = &fun->cursor;
@@ -1134,7 +1113,7 @@ bool __pst_handler::handle_dwarf()
 
 void __pst_handler::print_dwarf()
 {
-    ctx.offset = 0;
+    ctx.clean_print();
     ctx.print("DWARF-based stack trace information:\n");
     uint32_t idx = 0;
     for(pst_function* function = next_function(NULL); function; function = next_function(function)) {
@@ -1156,6 +1135,7 @@ Dwfl_Callbacks callbacks = {
 
 bool __pst_handler::unwind()
 {
+    ctx.clean_print();
 #ifdef REG_RIP // x86_64
     caller = (void *) ctx.hcontext->uc_mcontext.gregs[REG_RIP];
     ctx.sp = ctx.hcontext->uc_mcontext.gregs[REG_RSP];
@@ -1175,7 +1155,6 @@ bool __pst_handler::unwind()
 #else
 #   error "unknown architecture!"
 #endif
-    ctx.offset = 0;
 
     //handle = dlopen(NULL, RTLD_NOW);
 	Dl_info info;
@@ -1183,13 +1162,13 @@ bool __pst_handler::unwind()
 	ctx.base_addr = (uint64_t)info.dli_fbase;
 	ctx.log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
 
-    dwfl = dwfl_begin(&callbacks);
-    if(dwfl == NULL) {
+    ctx.dwfl = dwfl_begin(&callbacks);
+    if(ctx.dwfl == NULL) {
     	ctx.print("Failed to initialize libdw session for parse stack frames");
         return false;
     }
 
-    if(dwfl_linux_proc_report(dwfl, getpid()) != 0 || dwfl_report_end(dwfl, NULL, NULL) !=0) {
+    if(dwfl_linux_proc_report(ctx.dwfl, getpid()) != 0 || dwfl_report_end(ctx.dwfl, NULL, NULL) !=0) {
     	ctx.print("Failed to parse debug section of executable");
     	return false;
     }
@@ -1218,12 +1197,12 @@ bool __pst_handler::unwind()
         }
 
         ctx.print("[%-2d] ", i);
-        module = dwfl_addrmodule(dwfl, addr);
+        ctx.module = dwfl_addrmodule(ctx.dwfl, addr);
         pst_function* last = last_function();
         pst_function* fun = add_function(NULL);
         fun->sp = sp;
         ctx.log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
-        if(!fun->unwind(dwfl, module, addr)) {
+        if(!fun->unwind(addr)) {
             del_function(fun);
         } else {
             if(last) {
