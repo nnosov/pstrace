@@ -23,6 +23,7 @@
 #include <stdlib.h>
 
 #include "common.h"
+#include "context.h"
 #include "dictionary.h"
 #include "data_entry.h"
 

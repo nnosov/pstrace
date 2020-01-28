@@ -5,6 +5,7 @@
 #include "common.h"
 #include "linkedlist.h"
 #include "sysutils.h"
+#include "context.h"
 
 typedef enum {
     DWARF_TYPE_INVALID      = 0,    // no type
