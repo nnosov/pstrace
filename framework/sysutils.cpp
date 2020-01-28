@@ -1092,19 +1092,9 @@ bool __pst_handler::handle_dwarf()
         ctx.log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name.c_str(), info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
         ctx.curr_frame = &fun->cursor;
         ctx.sp = fun->sp;
-        //ctx.cfa = fun->parent ? fun->parent->sp : 0;
-        if(fun->parent) {
-            ctx.next_frame = &fun->parent->cursor;
-        } else {
-            ctx.next_frame = 0;
-        }
         ctx.cfa = fun->cfa;
 
         ctx.curr_frame = &fun->cursor;
-        ctx.next_frame = NULL;
-        if(fun->parent) {
-            ctx.next_frame = &fun->parent->cursor;
-        }
         get_dwarf_function(fun);
     }
 

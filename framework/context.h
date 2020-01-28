@@ -24,7 +24,6 @@ typedef struct __pst_context {
         sp = 0;
         cfa = 0;
         curr_frame = NULL;
-        next_frame = NULL;
         frame = NULL;
         dwfl = NULL;
         module = NULL;
@@ -48,11 +47,11 @@ typedef struct __pst_context {
     unw_context_t               context;    // context of stack trace
     unw_cursor_t                cursor;
     unw_cursor_t*               curr_frame; // callee libunwind frame
-    unw_cursor_t*               next_frame; // caller libunwind frame
     Dwarf_Addr                  base_addr;  // base address where process loaded
 
-    Dwarf_Addr                  sp;
-    Dwarf_Addr                  cfa;
+    Dwarf_Addr                  sp;         // stack pointer of currently processed stack frame
+    Dwarf_Addr                  cfa;        // CFA (Canonical Frame Address) of currently processed stack
+
     Dwarf_Frame*                frame;      // currently examined libdwfl frame
     Dwfl*                       dwfl;       // DWARF context
     Dwfl_Module*                module;     // currently processed CU
