@@ -34,7 +34,7 @@ typedef struct __pst_allocator {
 } pst_allocator;
 
 void pst_alloc_init(pst_allocator& alloc);
-void pst_allocator_init_custom(pst_allocator& alloc, void* buff, uint32_t size);
+void pst_alloc_init_custom(pst_allocator& alloc, void* buff, uint32_t size);
 void pst_alloc_fini(pst_allocator& alloc);
 
 #endif /* FRAMEWORK_ALLOCATOR_H_ */

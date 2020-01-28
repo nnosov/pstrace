@@ -46,9 +46,10 @@ void pst_alloc_init(pst_allocator& alloc)
     return;
 }
 
-void pst_allocator_init_custom(pst_allocator& alloc, void* buff, uint32_t size)
+void pst_alloc_init_custom(pst_allocator& alloc, void* buff, uint32_t size)
 {
     // TBD to implement custom allocator
+    pst_alloc_init(alloc);
     return;
 }
 
