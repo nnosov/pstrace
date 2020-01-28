@@ -52,3 +52,9 @@ void pst_allocator_init_custom(pst_allocator& alloc, void* buff, uint32_t size)
     return;
 }
 
+void pst_alloc_fini(pst_allocator& alloc)
+{
+    alloc.type = ALLOC_NONE;
+    alloc.base = NULL;
+    alloc.size = 0;
+}
