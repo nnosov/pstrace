@@ -83,8 +83,6 @@ typedef struct __dwarf_stack : public SC_ListHead {
         }
     }
 
-    bool is_expr_equal(__dwarf_stack* rhs);
-
     void push(void* v, uint32_t s, int t) {
         dwarf_value* value = new dwarf_value((char*)v, s, t);
         InsertFirst(value);

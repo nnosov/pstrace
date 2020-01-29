@@ -990,25 +990,6 @@ const dwarf_op_map* find_op_map(int op)
 	return NULL;
 }
 
-bool __dwarf_stack::is_expr_equal(__dwarf_stack* rhs)
-{
-    if(rhs->expr.Size() != expr.Size()) {
-        return false;
-    }
-
-    pst_dwarf_op* rop = (pst_dwarf_op*)rhs->expr.First();
-    pst_dwarf_op* lop = (pst_dwarf_op*)expr.First();
-    while(lop != NULL && rop != NULL) {
-        if(lop->operation != rop->operation || lop->arg1 != rop->arg1 || lop->arg2 != rop->arg2) {
-            return false;
-        }
-        lop = (pst_dwarf_op*)expr.Next(lop);
-        rop = (pst_dwarf_op*)rhs->expr.Next(rop);
-    }
-
-    return true;
-}
-
 bool __dwarf_stack::get_value(uint64_t& value)
 {
     if(!Size()) {
