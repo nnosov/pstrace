@@ -25,7 +25,7 @@ void clean_print(pst_context* ctx) {
 
 void print_stack(pst_context* ctx, int max, uint64_t next_cfa)
 {
-    ctx->log(SEVERITY_DEBUG, "CFA = %#lX, NEXT_CFA = %#lX, SP = %#lX", ctx->cfa, next_cfa, ctx->sp);
+    pst_log(SEVERITY_DEBUG, "CFA = %#lX, NEXT_CFA = %#lX, SP = %#lX", ctx->cfa, next_cfa, ctx->sp);
     ctx->clean_print(ctx);
     int i = 0;
     if(ctx->cfa > ctx->sp) {
@@ -74,7 +74,7 @@ bool print(pst_context* ctx, const char* fmt, ...)
 
 void log(SC_LogSeverity severity, const char* fmt, ...)
 {
-    logger.log(&logger, severity, fmt);
+    pst_log(severity, fmt);
 }
 
 bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr)
@@ -97,7 +97,7 @@ bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Att
                 ctx->print(ctx, "%s(*%s) value: 0x%lX", map->op_name, unw_regname(regno), value);
             } else if(map->op_num == DW_OP_GNU_entry_value) {
                 if(!attr) {
-                    ctx->log(SEVERITY_ERROR, "No attribute of DW_OP_GNU_entry_value provided");
+                    pst_log(SEVERITY_ERROR, "No attribute of DW_OP_GNU_entry_value provided");
                     return false;
                 }
                 uint32_t value = decode_uleb128((unsigned char*)&exprs[i].number);
@@ -110,11 +110,11 @@ bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Att
                         ctx->print_expr(ctx, expr, exprlen, &attr_mem);
                         ctx->print(ctx, ") ");
                     } else {
-                        ctx->log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
+                        pst_log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
                         return false;
                     }
                 } else {
-                    ctx->log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
+                    pst_log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
                     return false;
                 }
             } else if(map->op_num == DW_OP_stack_value) {

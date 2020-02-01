@@ -50,12 +50,12 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, pst_dwarf_expr* lo
                 ret = stack.calc(&stack, expr, exprlen, attr, fun);
             } else {
                 // Location skipped due to don't match current PC offset
-                ctx->log(SEVERITY_DEBUG, "Skip Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\"", i, start, end, ctx->buff);
+                pst_log(SEVERITY_DEBUG, "Skip Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\"", i, start, end, ctx->buff);
             }
         }
 
     } else {
-        ctx->log(SEVERITY_WARNING, "Unknown location attribute form = 0x%X, code = 0x%X, ", attr->form, attr->code);
+        pst_log(SEVERITY_WARNING, "Unknown location attribute form = 0x%X, code = 0x%X, ", attr->form, attr->code);
     }
 
     pst_dwarf_stack_fini(&stack);

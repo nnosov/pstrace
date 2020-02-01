@@ -389,7 +389,7 @@ bool dw_op_mul(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
     pst_dwarf_value* value2 = stack->get(stack, 1);
     if(value1 && value2) {
         if(!(value1->type & value2->type)) {
-            stack->ctx->log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%0x%X, %0x%X)", map->op_name, value1->type, value2->type);
+            pst_log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%0x%X, %0x%X)", map->op_name, value1->type, value2->type);
             return false;
         }
 
@@ -618,7 +618,7 @@ bool dw_op_call_frame_cfa(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf
 //    unw_word_t sp;
 //    int ret = unw_get_reg(stack->ctx->curr_frame, UNW_REG_SP, &sp);
 //    if(ret) {
-//        stack->ctx->log(SEVERITY_ERROR, "%s: failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, UNW_REG_SP, ret);
+//        pst_log(SEVERITY_ERROR, "%s: failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, UNW_REG_SP, ret);
 //        return false;
 //    }
 
@@ -635,7 +635,7 @@ bool dw_op_fbreg(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
     unw_word_t sp;
 //    int ret = unw_get_reg(stack->ctx->curr_frame, UNW_REG_SP, &sp);
 //    if(ret) {
-//        stack->ctx->log(SEVERITY_ERROR, "Failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, UNW_REG_SP, ret);
+//        pst_log(SEVERITY_ERROR, "Failed to get register 0x%X value. Error: %d", __PRETTY_FUNCTION__, UNW_REG_SP, ret);
 //        return false;
 //    }
 

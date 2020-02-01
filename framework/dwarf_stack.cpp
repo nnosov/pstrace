@@ -148,7 +148,7 @@ bool stack_get_value(pst_dwarf_stack* st, uint64_t* value)
         // dereference register location
         int ret = unw_get_reg(st->ctx->curr_frame, v->value.uint64, value);
         if(ret) {
-            st->ctx->log(SEVERITY_ERROR, "Failed to get value of register 0x%X. Error: %d", v->value.uint64, ret);
+            pst_log(SEVERITY_ERROR, "Failed to get value of register 0x%X. Error: %d", v->value.uint64, ret);
             return false;
         }
     } else if(v->type & DWARF_TYPE_MEMORY_LOC) {
@@ -183,7 +183,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
     for (int i = 0; i < expr_len; i++) {
         const dwarf_op_map* map = find_op_map(exprs[i].atom);
         if(!map) {
-            st->ctx->log(SEVERITY_ERROR, "Unknown operation type 0x%hhX(0x%lX, 0x%lX)", exprs[i].atom, exprs[i].number, exprs[i].number2);
+            pst_log(SEVERITY_ERROR, "Unknown operation type 0x%hhX(0x%lX, 0x%lX)", exprs[i].atom, exprs[i].number, exprs[i].number2);
             return false;
         }
 
@@ -197,7 +197,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
             uint64_t regno = *((uint64_t*)v->value.uint64);
             int ret = unw_get_reg(st->ctx->curr_frame, regno, &value);
             if(ret) {
-                st->ctx->log(SEVERITY_ERROR, "Failed to ger value of register 0x%X. Error: %d", regno, ret);
+                pst_log(SEVERITY_ERROR, "Failed to ger value of register 0x%X. Error: %d", regno, ret);
                 return false;
             }
             v->set(v, &value, sizeof(value), DWARF_TYPE_GENERIC);
@@ -206,11 +206,11 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
         // handle there because it contains sub-expression of a Location in caller's frame
         if(map->op_num == DW_OP_GNU_entry_value) {
             if(!fun) {
-                st->ctx->log(SEVERITY_ERROR, "Cannot calculate DW_OP_GNU_entry_value expression while function is undefined");
+                pst_log(SEVERITY_ERROR, "Cannot calculate DW_OP_GNU_entry_value expression while function is undefined");
                 return false;
             }
             if(!fun->parent) {
-                st->ctx->log(SEVERITY_ERROR, "Function has not parent while calculate DW_OP_GNU_entry_value expression");
+                pst_log(SEVERITY_ERROR, "Function has not parent while calculate DW_OP_GNU_entry_value expression");
                 return false;
             }
             // This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
@@ -222,7 +222,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                 if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
                     pst_call_site* cs = fun->parent->find_call_site(fun);
                     if(!cs) {
-                        st->ctx->log(SEVERITY_ERROR, "Failed to find call site while calculate DW_OP_GNU_entry_value expression");
+                        pst_log(SEVERITY_ERROR, "Failed to find call site while calculate DW_OP_GNU_entry_value expression");
                         return false;
                     }
                     pst_dwarf_expr loc;
@@ -231,7 +231,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                     pst_call_site_param* param = cs->find_param(loc);
                     pst_dwarf_expr_fini(&loc);
                     if(!param) {
-                        st->ctx->log(SEVERITY_ERROR, "Failed to find call site parameter while calculate DW_OP_GNU_entry_value expression");
+                        pst_log(SEVERITY_ERROR, "Failed to find call site parameter while calculate DW_OP_GNU_entry_value expression");
                         return false;
                     }
 
@@ -239,18 +239,18 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
 
                     continue;
                 } else {
-                    st->ctx->log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
+                    pst_log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
                     nret = false;
                     break;
                 }
             } else {
-                st->ctx->log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
+                pst_log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");
                 return false;
             }
         }
 
         if(!map->operation(st, map, exprs[i].number, exprs[i].number2)) {
-            st->ctx->log(SEVERITY_ERROR, "Failed to calculate %s(0x%lX, 0x%lX) operation", map->op_name, exprs[i].number, exprs[i].number2);
+            pst_log(SEVERITY_ERROR, "Failed to calculate %s(0x%lX, 0x%lX) operation", map->op_name, exprs[i].number, exprs[i].number2);
             return false;
         }
 

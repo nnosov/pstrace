@@ -129,23 +129,23 @@ pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t& regval)
                 ctx->print_expr_block(ops, nops, str, sizeof(str));
                 dwarf_stack st(ctx);
                 if(st.calc_expression(ops, nops, NULL) && st.get_value(regval)) {
-                    ctx->log(SEVERITY_DEBUG, "CFI register 0x%X(%s) expression: %s ==> %#lX", regno, reg_map[regno].regname, str, regval);
+                    pst_log(SEVERITY_DEBUG, "CFI register 0x%X(%s) expression: %s ==> %#lX", regno, reg_map[regno].regname, str, regval);
                     return REG_OK;
                 } else {
-                    ctx->log(SEVERITY_ERROR, "Failed to calculate register 0x%X(%s) CFI expression %s", regno, reg_map[regno].regname, str);
+                    pst_log(SEVERITY_ERROR, "Failed to calculate register 0x%X(%s) CFI expression %s", regno, reg_map[regno].regname, str);
                     return REG_EXPR_ERROR;
                 }
             } else {
-                ctx->log(SEVERITY_DEBUG, "CFI expression for register 0x%X(%s) is SAME VALUE", regno, reg_map[regno].regname);
+                pst_log(SEVERITY_DEBUG, "CFI expression for register 0x%X(%s) is SAME VALUE", regno, reg_map[regno].regname);
                 return REG_SAME;
             }
         } else {
-            ctx->log(SEVERITY_DEBUG, "CFI expression for register 0x%X(%s) is UNDEFINED", regno, reg_map[regno].regname);
+            pst_log(SEVERITY_DEBUG, "CFI expression for register 0x%X(%s) is UNDEFINED", regno, reg_map[regno].regname);
             return REG_UNDEFINED;
         }
 
     } else {
-        ctx->log(SEVERITY_ERROR, "Failed to get CFI expression for register 0x%X", regno);
+        pst_log(SEVERITY_ERROR, "Failed to get CFI expression for register 0x%X", regno);
     }
 
     return REG_CFI_ERROR;

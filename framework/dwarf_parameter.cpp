@@ -76,7 +76,7 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
     Dwarf_Die ret_die;
 
     if(!dwarf_formref_die(base, &ret_die)) {
-        logger.log(SEVERITY_ERROR, "Failed to get parameter DIE");
+        pst_log(SEVERITY_ERROR, "Failed to get parameter DIE");
         return false;
     }
 
@@ -88,7 +88,7 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
             if(attr) {
                 dwarf_formudata(attr, &param->size);
             }
-            logger.log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), param->size);
+            pst_log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), param->size);
             param->add_type(dwarf_diename(&ret_die), DW_TAG_base_type);
             param->type = DW_TAG_base_type;
 
@@ -100,42 +100,42 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
             break;
         }
         case DW_TAG_array_type:
-            logger.log(SEVERITY_DEBUG, "array type");
+            pst_log(SEVERITY_DEBUG, "array type");
             param->add_type("[]", DW_TAG_array_type);
             break;
         case DW_TAG_structure_type:
-            logger.log(SEVERITY_DEBUG, "structure type");
+            pst_log(SEVERITY_DEBUG, "structure type");
             param->add_type("struct", DW_TAG_structure_type);
             break;
         case DW_TAG_union_type:
-            logger.log(SEVERITY_DEBUG, "union type");
+            pst_log(SEVERITY_DEBUG, "union type");
             param->add_type("union", DW_TAG_union_type);
             break;
         case DW_TAG_class_type:
-            logger.log(SEVERITY_DEBUG, "class type");
+            pst_log(SEVERITY_DEBUG, "class type");
             param->add_type("class", DW_TAG_class_type);
             break;
         case DW_TAG_pointer_type:
-            logger.log(SEVERITY_DEBUG, "pointer type");
+            pst_log(SEVERITY_DEBUG, "pointer type");
             param->add_type("*", DW_TAG_pointer_type);
             break;
         case DW_TAG_enumeration_type:
-            logger.log(SEVERITY_DEBUG, "enumeration type");
+            pst_log(SEVERITY_DEBUG, "enumeration type");
             param->add_type("enum", DW_TAG_enumeration_type);
             break;
         case DW_TAG_const_type:
-            logger.log(SEVERITY_DEBUG, "constant type");
+            pst_log(SEVERITY_DEBUG, "constant type");
             param->add_type("const", DW_TAG_const_type);
             break;
         case DW_TAG_subroutine_type:
-            logger.log(SEVERITY_DEBUG, "Skipping subroutine type");
+            pst_log(SEVERITY_DEBUG, "Skipping subroutine type");
             break;
         case DW_TAG_typedef:
-            logger.log(SEVERITY_DEBUG, "typedef '%s' type", dwarf_diename(&ret_die));
+            pst_log(SEVERITY_DEBUG, "typedef '%s' type", dwarf_diename(&ret_die));
             param->add_type(dwarf_diename(&ret_die), DW_TAG_typedef);
             break;
         default:
-            logger.log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
+            pst_log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
             break;
     }
 
@@ -189,7 +189,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
     dwarf_decl_line(result, (int*)&param->line);
     // Get reference to attribute type of the parameter/variable
     attr = dwarf_attr(result, DW_AT_type, &attr_mem);
-    logger.log(SEVERITY_DEBUG, "---> Handle '%s' %s", param->name, dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
+    pst_log(SEVERITY_DEBUG, "---> Handle '%s' %s", param->name, dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
     if(attr) {
         param->handle_type(param, attr);
     }
@@ -203,7 +203,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
         if(handle_location(param->ctx, attr, &param->location, pc, fun)) {
             param->has_value = true;
         } else {
-            logger.log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", param->ctx->buff);
+            pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", param->ctx->buff);
             return false;
         }
     } else if(dwarf_hasattr(result, DW_AT_const_value)) {
@@ -212,7 +212,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
         switch (dwarf_whatform(attr)) {
             case DW_FORM_string:
                 // do nothing for now
-                logger.log(SEVERITY_WARNING, "Const value form DW_FORM_string value = %s.", dwarf_formstring(attr));
+                pst_log(SEVERITY_WARNING, "Const value form DW_FORM_string value = %s.", dwarf_formstring(attr));
                 break;
             case DW_FORM_data1:
             case DW_FORM_data2:
@@ -231,7 +231,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
                 break;
         }
         if(param->has_value) {
-            logger.log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->location.value);
+            pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->location.value);
         }
     }
 

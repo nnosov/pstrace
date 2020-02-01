@@ -60,7 +60,7 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 
     fatal_error_in_progress = 1;
 
-    logger.log(&logger, SEVERITY_ERROR, "%s signal handled", strsignal(sig));
+    pst_log(SEVERITY_ERROR, "%s signal handled", strsignal(sig));
     bool ret = false;
     pst_handler handler((ucontext_t*)context);
 
@@ -70,12 +70,12 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     }
 
 	if(ret) {
-	    logger.log(&logger, SEVERITY_INFO, "%s", handler.ctx.buff);
+	    pst_log(SEVERITY_INFO, "%s", handler.ctx.buff);
 	    handler.handle_dwarf();
 	    handler.print_dwarf();
-	    logger.log(&logger, SEVERITY_INFO, "%s", handler.ctx.buff);
+	    pst_log(SEVERITY_INFO, "%s", handler.ctx.buff);
 	} else {
-	    logger.log(&logger, SEVERITY_ERROR, "No stack trace obtained");
+	    pst_log(SEVERITY_ERROR, "No stack trace obtained");
 	}
 
     // comment out line below to prevent coredump
@@ -98,9 +98,9 @@ void SignalHandler(int sig)
 //	const char* str_sig = strsignal(sig);
 //	logger->Log(SEVERITY_INFO, "%s received.", str_sig);
 	if(sig == SIGUSR1) {
-		logger.log(&logger, SEVERITY_INFO, "Maintenance mode enabled.");
+		pst_log(SEVERITY_INFO, "Maintenance mode enabled.");
 	} else if(sig == SIGUSR2) {
-		logger.log(&logger, SEVERITY_INFO, "Maintenance mode disabled.");
+		pst_log(SEVERITY_INFO, "Maintenance mode disabled.");
 	}
 //	signal (sig, SIG_DFL);
 //	raise(sig);
@@ -177,7 +177,7 @@ void SetSignalHandler(sig_handler_t handler)
 	limit.rlim_max = 1073741824;
 	if (setrlimit(RLIMIT_CORE, &limit))
 	{
-		logger.log(&logger, SEVERITY_DEBUG, "Failed to set limit for core dump file size");
+		pst_log(SEVERITY_DEBUG, "Failed to set limit for core dump file size");
 	}
 }
 

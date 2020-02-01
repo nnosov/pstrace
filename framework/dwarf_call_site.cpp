@@ -113,7 +113,7 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                     // determine location of parameter in stack/heap or CPU registers
                     attr = dwarf_attr(child, DW_AT_location, &attr_mem);
                     if(!handle_location(site->ctx, attr, &param->location, pc, NULL)) {
-                        site->ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
+                        pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
                         site->del_param(site, param);
                         return false;
                     }
@@ -127,9 +127,9 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                     pst_dwarf_expr_init(&loc);
                     if(handle_location(site->ctx, attr, &loc, pc, NULL)) {
                         param->value = loc.value;
-                        site->ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
+                        pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
                     } else {
-                        site->ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
+                        pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
                         site->del_param(site, param);
                         return false;
                     }

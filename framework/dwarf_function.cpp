@@ -197,7 +197,7 @@ bool __pst_function::handle_lexical_block(Dwarf_Die* result)
                 {
                     case DW_TAG_variable:
                     case DW_TAG_formal_parameter:
-                        ctx->log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
+                        pst_log(SEVERITY_DEBUG, "Abstract origin: %s('%s')", dwarf_diename(&origin), dwarf_diename (&child));
                         break;
                     // Also handle  DW_TAG_unspecified_parameters (unknown number of arguments i.e. fun(arg1, ...);
                     default:
@@ -210,7 +210,7 @@ bool __pst_function::handle_lexical_block(Dwarf_Die* result)
     if(dwarf_diename(result)) {
         die_name = dwarf_diename(result);
     }
-    ctx->log(SEVERITY_DEBUG, "Lexical block with name '%s', tag 0x%X and origin '%s' found. lowpc = 0x%lX, highpc = 0x%lX", die_name, dwarf_tag (result), origin_name, lowpc, highpc);
+    pst_log(SEVERITY_DEBUG, "Lexical block with name '%s', tag 0x%X and origin '%s' found. lowpc = 0x%lX, highpc = 0x%lX", die_name, dwarf_tag (result), origin_name, lowpc, highpc);
     Dwarf_Die child;
     if(dwarf_child (result, &child) == 0) {
         do {
@@ -229,10 +229,10 @@ bool __pst_function::handle_lexical_block(Dwarf_Die* result)
                     handle_call_site(&child);
                     break;
                 case DW_TAG_inlined_subroutine:
-                    ctx->log(SEVERITY_DEBUG, "Skipping Lexical block tag 'DW_TAG_inlined_subroutine'");
+                    pst_log(SEVERITY_DEBUG, "Skipping Lexical block tag 'DW_TAG_inlined_subroutine'");
                     break;
                 default:
-                    ctx->log(SEVERITY_DEBUG, "Unknown Lexical block tag 0x%X", dwarf_tag(&child));
+                    pst_log(SEVERITY_DEBUG, "Unknown Lexical block tag 0x%X", dwarf_tag(&child));
                     break;
             }
         }while (dwarf_siblingof (&child, &child) == 0);
@@ -257,12 +257,12 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
 
-    ctx->log(SEVERITY_DEBUG, "***** DW_TAG_GNU_call_site contents:");
+    pst_log(SEVERITY_DEBUG, "***** DW_TAG_GNU_call_site contents:");
     // reference to DIE which represents callee's parameter if compiler knows where it is at compile time
     const char* oname = NULL;
     if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
         oname = dwarf_diename(&origin);
-        ctx->log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: '%s'", oname);
+        pst_log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: '%s'", oname);
     }
 
     // The call site may have a DW_AT_call_site_target attribute which is a DWARF expression.  For indirect calls or jumps where it is unknown at
@@ -274,13 +274,13 @@ bool __pst_function::handle_call_site(Dwarf_Die* result)
             pst_dwarf_expr expr(ctx->alloc);
             if(handle_location(ctx, &attr_mem, expr, pc, this)) {
                 target = expr.value;
-                ctx->log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %#lX", target);
+                pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %#lX", target);
             }
         }
     }
 
     if(target == 0 && oname == NULL) {
-        ctx->log(SEVERITY_ERROR, "Cannot determine both call-site target and origin");
+        pst_log(SEVERITY_ERROR, "Cannot determine both call-site target and origin");
         return false;
     }
 
@@ -309,7 +309,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
         dwarf_lowpc(d, &lowpc);
         dwarf_highpc(d, &highpc);
 //  } else {
-//      ctx->log(SEVERITY_ERROR, "Function's '%s' DIE hasn't definitions of memory offsets of function's code", dwarf_diename(d));
+//      pst_log(SEVERITY_ERROR, "Function's '%s' DIE hasn't definitions of memory offsets of function's code", dwarf_diename(d));
 //      return false;
 //  }
 
@@ -317,11 +317,11 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
     unw_get_proc_info(&cursor, &info);
     ctx->clean_print(ctx);
 
-    ctx->log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
+    pst_log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
             dwarf_diename(d), lowpc, highpc, pc - ctx->base_addr, info.start_ip, info.start_ip - ctx->base_addr);
     ctx->print_registers(ctx, 0x0, 0x10);
-    ctx->log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), parent ? parent->sp : 0, ctx->buff);
-    ctx->log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), ctx->buff);
+    pst_log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), parent ? parent->sp : 0, ctx->buff);
+    pst_log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), ctx->buff);
 
     // determine function's stack frame base
     attr = dwarf_attr(die, DW_AT_frame_base, &attr_mem);
@@ -335,16 +335,16 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
                 if(stack.calc(&stack, expr, exprlen, attr, this)) {
                     uint64_t value;
                     if(stack.get_value(&stack, &value)) {
-                        ctx->log(SEVERITY_DEBUG, "DW_AT_framebase expression: \"%s\" ==> 0x%lX", ctx->buff, value);
+                        pst_log(SEVERITY_DEBUG, "DW_AT_framebase expression: \"%s\" ==> 0x%lX", ctx->buff, value);
                     } else {
-                        ctx->log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_framebase expression: %s", ctx->buff);
+                        pst_log(SEVERITY_ERROR, "Failed to get value of calculated DW_AT_framebase expression: %s", ctx->buff);
                     }
                 } else {
-                    ctx->log(SEVERITY_ERROR, "Failed to calculate DW_AT_framebase expression: %s", ctx->buff);
+                    pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_framebase expression: %s", ctx->buff);
                 }
                 pst_dwarf_stack_fini(&stack);
             } else {
-                ctx->log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X", attr->form, attr->code);
+                pst_log(SEVERITY_WARNING, "Unknown attribute form = 0x%X, code = 0x%X", attr->form, attr->code);
             }
         }
     }
@@ -355,7 +355,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
     attr = dwarf_attr(die, DW_AT_type, &attr_mem);
     if(attr) {
         if(!ret_p->handle_type(attr)) {
-            ctx->log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", name.c_str());
+            pst_log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", name.c_str());
             del_param(ret_p);
         }
     } else {
@@ -410,7 +410,7 @@ bool __pst_function::handle_dwarf(Dwarf_Die* d)
             // DW_TAG_unspecified_parameters (unknown number of arguments i.e. fun(arg1, ...);
             // DW_AT_inline
             default:
-                ctx->log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
+                pst_log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
                 break;
         }
     } while(dwarf_siblingof(&result, &result) == 0);
@@ -449,7 +449,7 @@ bool __pst_function::unwind(Dwarf_Addr addr)
         demangle_name = abi::__cxa_demangle(addrname, NULL, NULL, &status);
         char* function_name = NULL;
         if(asprintf(&function_name, "%s%s", demangle_name ? demangle_name : addrname, demangle_name ? "" : "()") == -1) {
-            ctx->log(SEVERITY_ERROR, "Failed to allocate memory");
+            pst_log(SEVERITY_ERROR, "Failed to allocate memory");
             return false;
         }
         ctx->print(ctx, " --> %s", function_name);
@@ -479,14 +479,14 @@ bool __pst_function::get_frame()
         cfi = dwfl_module_dwarf_cfi(ctx->module, &mod_bias);
     }
     if(!cfi) {
-        ctx->log(SEVERITY_ERROR, "Cannot find CFI for module");
+        pst_log(SEVERITY_ERROR, "Cannot find CFI for module");
         return false;
     }
 
     // get frame of CFI for address
     int result = dwarf_cfi_addrframe (cfi, pc - mod_bias, &frame);
     if (result != 0) {
-        ctx->log(SEVERITY_ERROR, "Failed to find CFI frame for module");
+        pst_log(SEVERITY_ERROR, "Failed to find CFI frame for module");
         return false;
     }
 
@@ -503,10 +503,10 @@ bool __pst_function::get_frame()
         end += mod_bias;
         reginfo info; info.regno = ra_regno;
         dwfl_module_register_names(ctx->module, regname_callback, &info);
-        ctx->log(SEVERITY_INFO, "Function %s(...): '.eh/debug frame' info: PC range:  => [%#" PRIx64 ", %#" PRIx64 "], return register: %s, in_signal = %s",
+        pst_log(SEVERITY_INFO, "Function %s(...): '.eh/debug frame' info: PC range:  => [%#" PRIx64 ", %#" PRIx64 "], return register: %s, in_signal = %s",
                 name.c_str(), start, end, info.regname, signalp ? "true" : "false");
     } else {
-        ctx->log(SEVERITY_WARNING, "Return address register info unavailable (%s)", dwarf_errmsg(0));
+        pst_log(SEVERITY_WARNING, "Return address register info unavailable (%s)", dwarf_errmsg(0));
     }
 
     // finally get CFA (Canonical Frame Address)
@@ -516,7 +516,7 @@ bool __pst_function::get_frame()
     Dwarf_Op *cfa_ops = &dummy;
     size_t cfa_nops;
     if(dwarf_frame_cfa(frame, &cfa_ops, &cfa_nops)) {
-        ctx->log(SEVERITY_ERROR, "Failed to get CFA for frame");
+        pst_log(SEVERITY_ERROR, "Failed to get CFA for frame");
         return false;
     }
 
@@ -524,12 +524,12 @@ bool __pst_function::get_frame()
     pst_decl(pst_dwarf_stack, stack, ctx);
     if(stack.calc(&stack, cfa_ops, cfa_nops, NULL, this) && stack.get_value(&stack, &cfa)) {
         //ctx.sp = v;
-        ctx->log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", name.c_str(), ctx->buff, cfa);
+        pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", name.c_str(), ctx->buff, cfa);
 
         // setup context to match CFA for frame
         ctx->cfa = cfa;
     } else {
-        ctx->log(SEVERITY_ERROR, "Failed to calculate CFA expression");
+        pst_log(SEVERITY_ERROR, "Failed to calculate CFA expression");
     }
 
     pst_dwarf_stack_fini(&stack);
