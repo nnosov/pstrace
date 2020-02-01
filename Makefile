@@ -16,7 +16,7 @@ NC=
 COLOR=
 endif
 
-CXX 	= g++
+CXX 	= gcc
 CC  	= gcc
 RM 		= rm -f
 AR		= ar rvs
@@ -56,7 +56,7 @@ INCS		= -I./ \
 -I/usr/include/postgresql -I /usr/include/libxml2 -I./thirdparty -I/opt/swifttest/include  -I/usr/include/GraphicsMagick \
 -I./framework -I./framework/swi -I./framework/utils -I./framework/rmq -I./framework/logger -I$(BUILD_DIR)
 #FLAGS		= -Wall -gdwarf-4 -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -std=c++11
-FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -std=c++11
+FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
 
 
 .PHONY: all clean $(BIN)

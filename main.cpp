@@ -3,12 +3,8 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
-#include "logger/log_console.h"
-
+#include "context.h"
 #include "sysutils.h"
-
-static SC_LogConsole log_local(0, "/tmp/unspecified.file");
-SC_LogBase* logger = &log_local;
 
 typedef enum {
 	DEF_1 = 1,
@@ -64,7 +60,7 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 
     fatal_error_in_progress = 1;
 
-    logger->Log(SEVERITY_ERROR, "%s signal handled", strsignal(sig));
+    logger.log(&logger, SEVERITY_ERROR, "%s signal handled", strsignal(sig));
     bool ret = false;
     pst_handler handler((ucontext_t*)context);
 
@@ -74,12 +70,12 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     }
 
 	if(ret) {
-	    logger->Log(SEVERITY_INFO, "%s", handler.ctx.get_print());
+	    logger.log(&logger, SEVERITY_INFO, "%s", handler.ctx.buff);
 	    handler.handle_dwarf();
 	    handler.print_dwarf();
-	    logger->Log(SEVERITY_INFO, "%s", handler.ctx.get_print());
+	    logger.log(&logger, SEVERITY_INFO, "%s", handler.ctx.buff);
 	} else {
-	    logger->Log(SEVERITY_ERROR, "No stack trace obtained");
+	    logger.log(&logger, SEVERITY_ERROR, "No stack trace obtained");
 	}
 
     // comment out line below to prevent coredump
@@ -102,9 +98,9 @@ void SignalHandler(int sig)
 //	const char* str_sig = strsignal(sig);
 //	logger->Log(SEVERITY_INFO, "%s received.", str_sig);
 	if(sig == SIGUSR1) {
-		logger->Log(SEVERITY_INFO, "Maintenance mode enabled.");
+		logger.log(&logger, SEVERITY_INFO, "Maintenance mode enabled.");
 	} else if(sig == SIGUSR2) {
-		logger->Log(SEVERITY_INFO, "Maintenance mode disabled.");
+		logger.log(&logger, SEVERITY_INFO, "Maintenance mode disabled.");
 	}
 //	signal (sig, SIG_DFL);
 //	raise(sig);
@@ -181,7 +177,7 @@ void SetSignalHandler(sig_handler_t handler)
 	limit.rlim_max = 1073741824;
 	if (setrlimit(RLIMIT_CORE, &limit))
 	{
-		logger->Log(SEVERITY_DEBUG, "Failed to set limit for core dump file size");
+		logger.log(&logger, SEVERITY_DEBUG, "Failed to set limit for core dump file size");
 	}
 }
 
@@ -197,6 +193,7 @@ void ResetSignalHandler() {
 
 int main(int argc, char* argv[])
 {
+    pst_log_init_console(&logger);
     //logger->SetCurrentSeverity(SEVERITY_INFO);
     SetSignalHandler(SigusrHandler);
 

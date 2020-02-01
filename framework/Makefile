@@ -16,7 +16,7 @@ NC=
 COLOR=
 endif
 
-CXX = g++
+CXX = gcc
 CC  = gcc
 RM 	= rm -f
 AR	= ar rvs
@@ -37,7 +37,7 @@ SRC			= $(wildcard $(addsuffix /*.cpp,${VPATH}))
 OBJ			= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 
 INCS		= -I"../thirdparty" -I"./" -I"./utils" -I"./rmq" -I"/usr/include/json-c" -I"/usr/include/postgresql" -I /usr/include/libxml2  -I"/opt/swifttest/include" -I"../thirdparty/libswiftclient/src/lib"
-FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -std=c++11 -DSOFT_BUILD=$(SOFT_BUILD) -DUSER_BUILD=$(USER) -DDATE_BUILD="$(DATE_BUILD)"
+FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -DSOFT_BUILD=$(SOFT_BUILD) -DUSER_BUILD=$(USER) -DDATE_BUILD="$(DATE_BUILD)"
 
 .PHONY: all clean
 

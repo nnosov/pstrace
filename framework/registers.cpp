@@ -84,6 +84,7 @@ dwarf_reg_map   reg_map[] = {
     {0x1d, "XMM12", DW_OP_breg29},
     {0x1e, "XMM13", DW_OP_breg30},
     {0x1f, "XMM14", DW_OP_breg31},
+    {0x20, "XMM15", 0xff}, // no mapping to dwarf registers
 };
 
 int regnum = sizeof(reg_map) / sizeof(dwarf_reg_map);

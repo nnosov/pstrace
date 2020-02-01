@@ -19,67 +19,6 @@
 #include "dwarf_operations.h"
 #include "registers.h"
 
-bool dwarf_value::get_int(int64_t& v)
-{
-    switch (size) {
-    case 1:
-        v = *((int8_t*)value);
-        break;
-    case 2:
-        v = *((int16_t*)value);
-        break;
-    case 4:
-        v = *((int32_t*)value);
-        break;
-    case 8:
-        v = *((int64_t*)value);
-        break;
-    default:
-        return false;
-        break;
-    }
-
-    return true;
-}
-
-bool dwarf_value::get_uint(uint64_t& v)
-{
-    if(type & DWARF_TYPE_SIGNED) {
-        int64_t sig;
-        if(!get_int(sig)) {
-            return false;
-        }
-        v = llabs(sig);
-    } else {
-        return get_generic(v);
-    }
-
-    return true;
-}
-
-bool dwarf_value::get_generic(uint64_t& v)
-{
-    switch (size) {
-        case 1:
-            v = *((uint8_t*)value);
-            break;
-        case 2:
-            v = *((uint16_t*)value);
-            break;
-        case 4:
-            v = *((uint32_t*)value);
-            break;
-        case 8:
-            v = *((uint64_t*)value);
-            break;
-        default:
-            return false;
-            break;
-    }
-
-    return true;
-}
-
 bool is_location_form(int form)
 {
     if (form == DW_FORM_block1 || form == DW_FORM_block2 || form == DW_FORM_block4 || form == DW_FORM_block ||

@@ -22,103 +22,20 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 
+#include "allocator.h"
 #include "common.h"
 #include "context.h"
-#include "dictionary.h"
-#include "data_entry.h"
+#include "allocator.h"
+#include "list_head.h"
+#include "dwarf_expression.h"
+#include "dwarf_parameter.h"
 
-
-// DWARF operation (represents our own DW_OP_XXX)
-typedef struct __pst_dwarf_op : public SC_ListNode {
-    __pst_dwarf_op(uint8_t op, uint64_t a1, uint64_t a2) {
-        operation = op; arg1 = a1; arg2 = a2;
-    }
-    uint8_t                     operation;
-    uint64_t                    arg1;
-    uint64_t                    arg2;
-} pst_dwarf_op;
-
-typedef struct __pst_dwarf_expr : public SC_ListHead {
-    __pst_dwarf_expr() {
-        has_value = false; value = 0; offset = 0; buff[0] = 0;
-    }
-    ~__pst_dwarf_expr() {
-        clean();
-    }
-    pst_dwarf_op* add_op(uint8_t op, uint64_t arg1, uint64_t arg2);
-    pst_dwarf_op* next_op(pst_dwarf_op* op);
-    void clean();
-    void setup(Dwarf_Op* expr, size_t exprlen);
-    void set_value(uint64_t v) {
-        has_value = true;
-        value = v;
-    }
-    bool print_op(const char* fmt, ...);
-
-    bool operator== (__pst_dwarf_expr &rhs);
-
-    bool        has_value;
-    uint64_t    value;
-    char        buff[512];
-    uint16_t    offset;
-} pst_dwarf_expr;
-
-typedef struct __pst_type : public SC_ListNode {
-    __pst_type(const char* n, uint32_t t) : type(t) {
-        if(n) {
-            name = n;
-        }
-    }
-    std::string name;   // type name
-    uint32_t    type;   // DW_AT_XXX type
-} pst_type;
-
-typedef struct __pst_function pst_function;
-
-typedef struct __pst_parameter : public SC_ListNode {
-	__pst_parameter(pst_context* c) : ctx(c)
-	{
-		die = NULL;
-		size = 0;
-		type = 0;
-		enc_type = 0;
-		is_return = false;
-		is_variable = false;
-		has_value = false;
-		line = 0;
-	}
-
-	~__pst_parameter()
-	{
-	    clear();
-	}
-
-	void clear();
-	pst_type* add_type(const char* name, int type);
-	pst_type* next_type(pst_type* t);
-
-	bool handle_dwarf(Dwarf_Die* d, __pst_function* fun);
-	bool handle_type(Dwarf_Attribute* param);
-	bool print_dwarf();
-
-	Dwarf_Die*					die; 	// DWARF DIE containing parameter's definition
-	std::string					name;	// parameter's name
-	uint32_t                    line;   // line of parameter definition
-	Dwarf_Word					size;	// size of parameter in bytes
-	int							type;	// type of parameter in DW_TAG_XXX types enumeration
-	Dwarf_Word                  enc_type; // if 'type' is DW_TAG_Base_type, then 'base_type' holds DW_AT_ATE_XXX base type encoding type
-	SC_ListHead	                types;	// list of parameter's definitions i.e. 'typedef', 'uint32_t'
-	bool						is_return; // whether this parameter is return value of the function
-	bool                        is_variable;// whether this parameter is function variable or argument of function
-	bool                        has_value; // whether we got value of parameter or not
-	pst_dwarf_expr              location;
-	pst_context*				ctx;
-} pst_parameter;
 
 // DW_TAG_call_site_parameter
 typedef struct __pst_call_site_param : public SC_ListNode {
     __pst_call_site_param(pst_context* ctx) {
         param = NULL; name = NULL; value = 0;
+        pst_dwarf_expr_init(&location, ctx->alloc);
     }
 
     ~__pst_call_site_param() {
@@ -233,8 +150,9 @@ typedef struct __pst_function : public SC_ListNode {
 } pst_function;
 
 typedef struct __pst_handler {
-	__pst_handler(ucontext_t* hctx) : ctx(hctx)
+	__pst_handler(ucontext_t* hctx)
 	{
+		pst_context_init(&ctx, hctx);
 		caller = NULL;
 		frame = NULL;
 		addr = 0;
@@ -248,6 +166,7 @@ typedef struct __pst_handler {
 		}
 
 		clear();
+		pst_context_fini(&ctx);
 	}
 
     void clear();
