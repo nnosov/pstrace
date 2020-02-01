@@ -18,22 +18,23 @@
 #include "allocator.h"
 
 extern pst_log          logger;     // logger for whole PST library
-extern pst_allocator    allocator;  // custom allocator for PS library
+extern pst_allocator    allocator;  // custom allocator for PST library
 
 #define pst_alloc(TYPE) (TYPE*)allocator.alloc(&allocator, sizeof(TYPE))
 #define pst_free(NAME) allocator.free(&allocator, NAME)
 
 #define pst_log(SEVERITY, FORMAT, ...) logger.log(&logger, SEVERITY, FORMAT, ##__VA_ARGS__)
-char* pst_dup(const char* str);
 
-typedef struct __pst_context {
+char* pst_strdup(const char* str);
+
+typedef struct pst_context {
     // methods
-    void (*clean_print) (__pst_context* ctx);
-    bool (*print) (__pst_context* ctx, const char* fmt, ...);
-    void (*log) (SC_LogSeverity severity, const char*fmt, ...);
-    bool (*print_expr) (__pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr);
-    void (*print_registers) (__pst_context* ctx, int from, int to);
-    void (*print_stack) (__pst_context* ctx, int max, uint64_t next_cfa);
+    void (*clean_print)     (pst_context* ctx);
+    bool (*print)           (pst_context* ctx, const char* fmt, ...);
+    void (*log)             (SC_LogSeverity severity, const char*fmt, ...);
+    bool (*print_expr)      (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr);
+    void (*print_registers) (pst_context* ctx, int from, int to);
+    void (*print_stack)     (pst_context* ctx, int max, uint64_t next_cfa);
 
     // fields
     ucontext_t*                 hcontext;   // context of signal handler

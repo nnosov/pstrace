@@ -196,7 +196,7 @@ void pst_context_fini(pst_context* ctx)
 }
 
 
-char* pst_dup(const char* str)
+char* pst_strdup(const char* str)
 {
     pst_assert(str);
 

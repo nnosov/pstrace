@@ -62,9 +62,10 @@ typedef struct pst_call_site {
     pst_context*    ctx;        // execution context
     bool            allocated;  // whether this object was allocated or not
 } pst_call_site;
-void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const char* orn);
-pst_call_site* pst_call_site_new(pst_context* c, uint64_t tgt, const char* orn);
+void pst_call_site_init(pst_call_site* site, pst_context* context, uint64_t target, const char* origin);
+pst_call_site* pst_call_site_new(pst_context* context, uint64_t target, const char* origin);
 void pst_call_site_fini(pst_call_site* site);
+
 
 // -----------------------------------------------------------------------------------
 // storage for all of  function's call sites

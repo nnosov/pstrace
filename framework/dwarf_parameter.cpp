@@ -18,7 +18,7 @@
 void pst_type_init(pst_type* t, const char* name, uint32_t type)
 {
     list_node_init(&t->node);
-    t->name = pst_dup(name);
+    t->name = pst_strdup(name);
     t->type = type;
     t->allocated = false;
 }
@@ -183,7 +183,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
 
-    param->name = pst_dup(dwarf_diename(result));
+    param->name = pst_strdup(dwarf_diename(result));
     param->is_variable = (dwarf_tag(result) == DW_TAG_variable);
 
     dwarf_decl_line(result, (int*)&param->line);
