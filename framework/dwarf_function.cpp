@@ -5,6 +5,8 @@
  *      Author: nnosov
  */
 
+#include <dwarf.h>
+
 #include "dwarf_function.h"
 
 
@@ -51,66 +53,6 @@ pst_parameter* __pst_function::next_param(pst_parameter* p)
     }
 
     return next;
-}
-
-pst_call_site* __pst_function::add_call_site(uint64_t target, const char* origin)
-{
-    pst_call_site* st = new pst_call_site(ctx, target, origin);
-    call_sites.InsertLast(st);
-    if(target) {
-        mCallStToTarget.Insert(&target, sizeof(target), st);
-    }
-
-    if(origin) {
-        mCallStToOrigin.Insert(origin, strlen(origin), st);
-    }
-
-    return st;
-}
-void __pst_function::del_call_site(pst_call_site* st)
-{
-    call_sites.Remove(st);
-    if(st->target && mCallStToTarget.Lookup(&st->target, sizeof(st->target))) {
-        mCallStToTarget.Remove();
-    }
-
-    if(st->origin && mCallStToTarget.Lookup(st->origin, strlen(st->origin))) {
-        mCallStToTarget.Remove();
-    }
-
-    delete st;
-}
-pst_call_site* __pst_function::next_call_site(pst_call_site* st)
-{
-    pst_call_site* next = NULL;
-    if(st) {
-        next = (pst_call_site*)call_sites.First();
-    } else {
-        next = (pst_call_site*)call_sites.Next(st);
-    }
-
-    return next;
-}
-
-pst_call_site* __pst_function::call_site_by_origin(const char* origin)
-{
-    return (pst_call_site*)mCallStToOrigin.Lookup(origin, strlen(origin));
-}
-
-pst_call_site* __pst_function::call_site_by_target(uint64_t target)
-{
-    return (pst_call_site*)mCallStToTarget.Lookup(&target, sizeof(target));
-}
-
-pst_call_site* __pst_function::find_call_site(pst_function* callee)
-{
-    uint64_t start_pc = ctx->base_addr + callee->lowpc;
-    pst_call_site* cs = (pst_call_site*)mCallStToTarget.Lookup(&start_pc, sizeof(start_pc));
-    if(!cs) {
-        cs = (pst_call_site*)mCallStToOrigin.Lookup(callee->name.c_str(), strlen(callee->name.c_str()));
-    }
-
-    return cs;
 }
 
 bool __pst_function::print_dwarf()
@@ -236,61 +178,6 @@ bool __pst_function::handle_lexical_block(Dwarf_Die* result)
                     break;
             }
         }while (dwarf_siblingof (&child, &child) == 0);
-    }
-
-    return true;
-}
-
-// DW_AT_low_pc should point to the offset from process base address which is actually PC of current function, usually.
-// further handle DW_AT_abstract_origin attribute of DW_TAG_GNU_call_site DIE to determine what DIE is referenced by it.
-// probably by invoke by:
-// Dwarf_Die *scopes;
-// int n = dwarf_getscopes_die (funcdie, &scopes); // where 'n' is the number of scopes
-// if (n <= 0) -> FAILURE
-// see handle_function() in elfutils/tests/funcscopes.c -> handle_function() -> print_vars()
-// DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
-// relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
-// get DIE of return type
-bool __pst_function::handle_call_site(Dwarf_Die* result)
-{
-    Dwarf_Die origin;
-    Dwarf_Attribute attr_mem;
-    Dwarf_Attribute* attr;
-
-    pst_log(SEVERITY_DEBUG, "***** DW_TAG_GNU_call_site contents:");
-    // reference to DIE which represents callee's parameter if compiler knows where it is at compile time
-    const char* oname = NULL;
-    if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
-        oname = dwarf_diename(&origin);
-        pst_log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: '%s'", oname);
-    }
-
-    // The call site may have a DW_AT_call_site_target attribute which is a DWARF expression.  For indirect calls or jumps where it is unknown at
-    // compile time which subprogram will be called the expression computes the address of the subprogram that will be called.
-    uint64_t target = 0;
-    if(dwarf_hasattr (result, DW_AT_GNU_call_site_target)) {
-        attr = dwarf_attr(result, DW_AT_GNU_call_site_target, &attr_mem);
-        if(attr) {
-            pst_dwarf_expr expr(ctx->alloc);
-            if(handle_location(ctx, &attr_mem, expr, pc, this)) {
-                target = expr.value;
-                pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %#lX", target);
-            }
-        }
-    }
-
-    if(target == 0 && oname == NULL) {
-        pst_log(SEVERITY_ERROR, "Cannot determine both call-site target and origin");
-        return false;
-    }
-
-    Dwarf_Die child;
-    if(dwarf_child (result, &child) == 0) {
-        pst_call_site* st = add_call_site(target, oname);
-        if(!st->handle_dwarf(&child)) {
-            del_call_site(st);
-            return false;
-        }
     }
 
     return true;
@@ -537,3 +424,27 @@ bool __pst_function::get_frame()
     return true;
 }
 
+void pst_function_init(pst_function* fun, pst_context* _ctx, __pst_function* _parent)
+{
+    list_node_init(&fun->node);
+    fun->pc = 0;
+    fun->line = -1;
+    fun->die = NULL;
+    fun->lowpc = 0;
+    fun->highpc = 0;
+    memcpy(&fun->cursor, _ctx->curr_frame, sizeof(fun->cursor));
+    pst_call_site_storage_init(&fun->call_sites, fun->ctx);
+    fun->parent = _parent;
+    fun->sp = 0;
+    fun->cfa = 0;
+    fun->frame = NULL;
+    fun->name = NULL;
+}
+
+void pst_function_fini(pst_function* fun)
+{
+    clear();
+    if(frame) {
+        free(frame);
+    }
+}

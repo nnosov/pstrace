@@ -9,6 +9,8 @@
 
 #include "dwarf_call_site.h"
 #include "dwarf_utils.h"
+#include "hash_multimap.h"
+#include "dwarf_utils.h"
 
 // -----------------------------------------------------------------------------------
 // pst_call_site_param
@@ -100,8 +102,7 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
     Dwarf_Attribute* attr;
 
     do {
-        switch(dwarf_tag(child))
-        {
+        switch(dwarf_tag(child)) {
             case DW_TAG_GNU_call_site_parameter: {
                 Dwarf_Addr pc;
                 unw_get_reg(site->ctx->curr_frame, UNW_REG_IP,  &pc);
@@ -144,7 +145,8 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
     return true;
 }
 
-void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const char* orn) {
+void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const char* orn)
+{
     // methods
 
 
@@ -186,3 +188,165 @@ void pst_call_site_fini(pst_call_site* site)
     }
 }
 
+
+// -----------------------------------------------------------------------------------
+// pst_call_site_storage
+// -----------------------------------------------------------------------------------
+
+// DW_AT_low_pc should point to the offset from process base address which is actually PC of current function, usually.
+// further handle DW_AT_abstract_origin attribute of DW_TAG_GNU_call_site DIE to determine what DIE is referenced by it.
+// probably by invoke by:
+// Dwarf_Die *scopes;
+// int n = dwarf_getscopes_die (funcdie, &scopes); // where 'n' is the number of scopes
+// if (n <= 0) -> FAILURE
+// see handle_function() in elfutils/tests/funcscopes.c -> handle_function() -> print_vars()
+// DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
+// relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
+// get DIE of return type
+bool storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result)
+{
+    Dwarf_Die origin;
+    Dwarf_Attribute attr_mem;
+    Dwarf_Attribute* attr;
+
+    pst_log(SEVERITY_DEBUG, "***** DW_TAG_GNU_call_site contents:");
+    // reference to DIE which represents callee's parameter if compiler knows where it is at compile time
+    const char* oname = NULL;
+    if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
+        oname = dwarf_diename(&origin);
+        pst_log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: '%s'", oname);
+    }
+
+    // The call site may have a DW_AT_call_site_target attribute which is a DWARF expression.  For indirect calls or jumps where it is unknown at
+    // compile time which subprogram will be called the expression computes the address of the subprogram that will be called.
+    uint64_t target = 0;
+    if(dwarf_hasattr (result, DW_AT_GNU_call_site_target)) {
+        attr = dwarf_attr(result, DW_AT_GNU_call_site_target, &attr_mem);
+        if(attr) {
+            pst_dwarf_expr expr;
+            pst_dwarf_expr_init(&expr);
+            if(handle_location(storage->ctx, &attr_mem, expr, pc, this)) {
+                target = expr.value;
+                pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %#lX", target);
+            }
+            pst_dwarf_expr_fini(&expr);
+        }
+    }
+
+    if(target == 0 && oname == NULL) {
+        pst_log(SEVERITY_ERROR, "Cannot determine both call-site target and origin");
+        return false;
+    }
+
+    Dwarf_Die child;
+    if(dwarf_child (result, &child) == 0) {
+        pst_call_site* st = storage->add_call_site(storage, target, oname);
+        if(!st->handle_dwarf(st, &child)) {
+            storage->del_call_site(storage, st);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+pst_call_site* storage_call_site_by_origin(pst_call_site_storage* storage, const char* origin)
+{
+    pst_call_site* ret = NULL;
+    hash_node* node = hash_find(&storage->cs_to_origin, origin, strlen(origin));
+    if(node) {
+        ret = hash_entry(node, pst_call_site, node);
+    }
+
+    return ret;
+}
+
+pst_call_site* storage_call_site_by_target(pst_call_site_storage* storage, uint64_t target)
+{
+    pst_call_site* ret = NULL;
+    hash_node* node = hash_find(&storage->cs_to_target, (char*)&target, sizeof(target));
+    if(node) {
+        ret = hash_entry(node, pst_call_site, node);
+    }
+
+    return ret;
+}
+
+pst_call_site* storage_add_call_site(pst_call_site_storage* storage, uint64_t target, const char* origin)
+{
+    pst_new(pst_call_site, st, storage->ctx, target, origin);
+    list_add_bottom(&storage->call_sites, &st->node);
+
+    if(target) {
+        hash_add(&storage->cs_to_target, &st->tgt_node, &target, sizeof(target));
+    } else if(origin) {
+        hash_add(&storage->cs_to_origin, &st->org_node, (char*)origin, strlen(origin));
+    }
+
+    return st;
+}
+
+void storage_del_call_site(pst_call_site_storage* storage, pst_call_site* st)
+{
+    hash_node* node = NULL;
+    list_del(&st->node);
+
+    if(st->target) {
+       node = hash_find(&storage->cs_to_target, &st->target, sizeof(st->target));
+    } else if(st->origin) {
+        node = hash_find(&storage->cs_to_origin, st->origin, strlen(st->origin));
+    }
+
+    if(node) {
+        hash_del(node);
+    }
+
+    pst_free(st);
+}
+pst_call_site* storage_next_call_site(pst_call_site_storage* storage, pst_call_site* st)
+{
+    struct list_node* n = (st == NULL) ? list_first(&storage->call_sites) : list_next(&st->node);
+
+    pst_call_site* ret = NULL;
+    if(n) {
+        ret = list_entry(n, pst_call_site, node);
+    }
+
+    return ret;
+}
+
+pst_call_site* storage_find_call_site(pst_call_site_storage* storage, pst_function* callee)
+{
+    uint64_t start_pc = storage->ctx->base_addr + callee->lowpc;
+    pst_call_site* cs = storage_call_site_by_target(storage, start_pc);
+    if(!cs) {
+        cs = storage_call_site_by_origin(storage, callee->name.c_str());
+    }
+
+    return cs;
+}
+
+void pst_call_site_storage_init(pst_call_site_storage* storage, pst_context* ctx)
+{
+    storage->ctx = ctx;
+    list_head_init(&storage->call_sites);
+    hash_head_init(&storage->cs_to_target);
+    hash_head_init(&storage->cs_to_origin);
+    storage->allocated = false;
+}
+
+pst_call_site_storage* pst_call_site_storage_new(pst_context* ctx)
+{
+    pst_call_site_storage* ns = pst_alloc(pst_call_site_storage);
+    if(ns) {
+        pst_call_site_storage_init(ns, ctx);
+        ns->allocated = true;
+    }
+
+    return ns;
+}
+
+void pst_call_site_storage_fini(pst_call_site_storage* storage)
+{
+
+}
