@@ -152,7 +152,7 @@ bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Att
     return true;
 }
 
-void pst_context_init(pst_context* ctx, pst_allocator* alloc, ucontext_t* hctx)
+void pst_context_init(pst_context* ctx, ucontext_t* hctx)
 {
     // global
     pst_alloc_init(&allocator);
@@ -193,4 +193,17 @@ void pst_context_fini(pst_context* ctx)
     // global
     pst_log_fini(&logger);
     pst_alloc_fini(&allocator);
+}
+
+
+char* pst_dup(const char* str)
+{
+    pst_assert(str);
+
+    uint32_t len = strlen(str);
+    char* dst = (char*)allocator.alloc(len + 1);
+    memcpy(dst, str, len);
+    dst[len] = 0;
+
+    return dst;
 }

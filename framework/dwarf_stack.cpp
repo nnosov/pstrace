@@ -78,7 +78,7 @@ pst_dwarf_value* pst_dwarf_value_new(char* v, uint32_t s, int t)
 {
     pst_assert(v);
 
-    pst_dwarf_value* nv = (pst_dwarf_value*)allocator.alloc(&allocator, sizeof(pst_dwarf_value));
+    pst_dwarf_value* nv = pst_alloc(pst_dwarf_value);
     if(nv) {
         pst_dwarf_value_init(nv, v, s, t);
         nv->allocated = true;
@@ -93,7 +93,7 @@ void pst_dwarf_value_fini(pst_dwarf_value* value)
     pst_assert(value);
 
     if(value->allocated) {
-        allocator.free(&allocator, value);
+        pst_free(value);
     } else {
         value->type = DWARF_TYPE_INVALID;
         value->value.uint64 = 0;
@@ -105,7 +105,7 @@ void pst_dwarf_value_fini(pst_dwarf_value* value)
 // DWARF stack
 // -----------------------------------------------------------------------------------
 void stack_push(pst_dwarf_stack* st, void* v, uint32_t s, int t) {
-    pst_alloc(pst_dwarf_value, value, (char*)v, s, t);
+    pst_new(pst_dwarf_value, value, (char*)v, s, t);
     list_add_head(&st->values, &value->node);
 }
 
@@ -187,7 +187,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
             return false;
         }
 
-        pst_alloc(pst_dwarf_op, op, exprs[i].atom, exprs[i].number, exprs[i].number2);
+        pst_new(pst_dwarf_op, op, exprs[i].atom, exprs[i].number, exprs[i].number2);
         list_add_bottom(&st->expr, &op->node);
 
         pst_dwarf_value* v = st->get(st, 0);
@@ -280,7 +280,7 @@ pst_dwarf_stack* pst_dwarf_stack_new(pst_context* ctx)
 {
     pst_assert(ctx);
 
-    pst_alloc(pst_dwarf_stack, ns, ctx);
+    pst_new(pst_dwarf_stack, ns, ctx);
     if(ns) {
         pst_dwarf_stack_init(ns, ctx);
         ns->allocated = true;
@@ -295,7 +295,7 @@ void pst_dwarf_stack_fini(pst_dwarf_stack* st)
 
     st->clear(st);
     if(st->allocated) {
-        allocator.free(&allocator, st);
+        pst_free(st);
     } else {
         st->ctx = NULL;
     }

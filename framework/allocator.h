@@ -20,11 +20,11 @@
     TYPE NAME; CAT2(TYPE, _init) (&NAME, __VA_ARGS__);
 
 // allocation with initialization
-#define pst_alloc(TYPE, NAME, ...) \
+#define pst_new(TYPE, NAME, ...) \
     TYPE* NAME; NAME = CAT2(TYPE, _new) (__VA_ARGS__);
 
 // de-initialization and deletion if was previously allocated
-#define pst_free(TYPE, NAME) \
+#define pst_fini(TYPE, NAME) \
     CAT2(TYPE, _fini) (NAME);
 
 typedef struct __pst_allocator pst_allocator;
@@ -52,7 +52,5 @@ typedef struct __pst_allocator {
 void pst_alloc_init(pst_allocator* alloc);
 void pst_alloc_init_custom(pst_allocator* alloc, void* buff, uint32_t size);
 void pst_alloc_fini(pst_allocator* alloc);
-
-char* pst_dup(pst_allocator* alloc, const char* str);
 
 #endif /* PST_ALLOCATOR_H_ */

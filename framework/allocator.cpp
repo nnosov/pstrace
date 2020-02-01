@@ -63,15 +63,3 @@ void pst_alloc_fini(pst_allocator* alloc)
         alloc->size = 0;
     }
 }
-
-char* pst_dup(pst_allocator* alloc, const char* str)
-{
-    pst_assert(alloc && str);
-
-    uint32_t len = strlen(str);
-    char* dst = (char*)alloc->alloc(len + 1);
-    memcpy(dst, str, len);
-    dst[len] = 0;
-
-    return dst;
-}

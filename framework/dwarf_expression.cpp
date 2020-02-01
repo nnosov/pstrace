@@ -26,11 +26,9 @@ void pst_dwarf_op_init(pst_dwarf_op* dwop, uint8_t op, uint64_t a1, uint64_t a2)
     dwop->allocated = false;
 }
 
-pst_dwarf_op* pst_dwarf_op_new(pst_allocator* alloc, uint8_t op, uint64_t a1, uint64_t a2)
+pst_dwarf_op* pst_dwarf_op_new(uint8_t op, uint64_t a1, uint64_t a2)
 {
-    pst_assert(alloc);
-
-    pst_dwarf_op* nop = (pst_dwarf_op*)alloc->alloc(alloc, sizeof(pst_dwarf_op));
+    pst_dwarf_op* nop = pst_alloc(pst_dwarf_op);
     if(nop) {
         pst_dwarf_op_init(nop, op, a1, a2);
         nop->allocated = true;
@@ -44,7 +42,7 @@ void pst_dwarf_op_fini(pst_dwarf_op* dwop)
     assert(dwop);
 
     if(dwop->allocated) {
-        allocator.free(&allocator, dwop);
+        pst_free(dwop);
     } else {
         dwop->operation = 0;
         dwop->arg1 = 0;
@@ -76,7 +74,7 @@ bool expr_is_equal(pst_dwarf_expr* lhs, pst_dwarf_expr* rhs)
 
 pst_dwarf_op* expr_add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1, uint64_t arg2)
 {
-    pst_alloc(pst_dwarf_op, op, operation, arg1, arg2);
+    pst_new(pst_dwarf_op, op, operation, arg1, arg2);
     list_add_bottom(&expr->operations, &op->node);
 
     return op;
@@ -158,7 +156,7 @@ void pst_dwarf_expr_init(pst_dwarf_expr* expr)
 
 pst_dwarf_expr* pst_dwarf_expr_new()
 {
-    pst_dwarf_expr* ne = allocator.alloc(sizeof(pst_dwarf_expr));
+    pst_dwarf_expr* ne = pst_alloc(pst_dwarf_expr);
     if(ne) {
         pst_dwarf_expr_init(ne);
         ne->allocated = true;
@@ -171,6 +169,6 @@ void pst_dwarf_expr_fini(pst_dwarf_expr* expr)
 {
     expr->clean();
     if(expr->allocated) {
-        allocator.free(expr);
+        pst_free(expr);
     }
 }

@@ -20,6 +20,12 @@
 extern pst_log          logger;     // logger for whole PST library
 extern pst_allocator    allocator;  // custom allocator for PS library
 
+#define pst_alloc(TYPE) (TYPE*)allocator.alloc(&allocator, sizeof(TYPE))
+#define pst_free(NAME) allocator.free(&allocator, NAME)
+
+#define pst_log(SEVERITY, FORMAT, ...) logger.log(&logger, SEVERITY, FORMAT, ##__VA_ARGS__)
+char* pst_dup(const char* str);
+
 typedef struct __pst_context {
     // methods
     void (*clean_print) (__pst_context* ctx);

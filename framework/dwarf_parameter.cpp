@@ -10,6 +10,7 @@
 
 #include "dwarf_parameter.h"
 #include "dwarf_utils.h"
+#include "context.h"
 
 //
 // pst_type
@@ -17,14 +18,14 @@
 void pst_type_init(pst_type* t, const char* name, uint32_t type)
 {
     list_node_init(&t->node);
-    t->name = pst_dup(&allocator, name);
+    t->name = pst_dup(name);
     t->type = type;
     t->allocated = false;
 }
 
 pst_type* pst_type_new(const char* name, uint32_t type)
 {
-    pst_type* nt = (pst_type*)allocator.alloc(&allocator, sizeof(pst_type));
+    pst_type* nt = pst_alloc(pst_type);
     if(nt) {
         pst_type_init(nt, name, type);
         nt->allocated = true;
@@ -35,9 +36,9 @@ pst_type* pst_type_new(const char* name, uint32_t type)
 
 void pst_type_fini(pst_type* t)
 {
-    allocator.free(&allocator, t->name);
+    pst_free(t->name);
     if(t->allocated) {
-        allocator.free(&allocator, t);
+        pst_free(t);
     }
 }
 
@@ -148,7 +149,7 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
 
 pst_type* param_add_type(pst_parameter* param, const char* name, int type)
 {
-    pst_alloc(pst_type, t, name, type);
+    pst_new(pst_type, t, name, type);
     list_add_bottom(&param->types, &t->node);
 
     return t;
@@ -182,7 +183,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
 
-    param->name = pst_dup(&allocator, dwarf_diename(result));
+    param->name = pst_dup(dwarf_diename(result));
     param->is_variable = (dwarf_tag(result) == DW_TAG_variable);
 
     dwarf_decl_line(result, (int*)&param->line);
@@ -284,7 +285,7 @@ void pst_parameter_init(pst_parameter*param, pst_context* ctx)
 
 pst_parameter* pst_parameter_new(pst_context* ctx)
 {
-    pst_parameter* param = (pst_parameter*)allocator.alloc(&allocator, sizeof(pst_parameter));
+    pst_parameter* param = pst_alloc(pst_parameter);
     if(param) {
         pst_parameter_init(param, ctx);
         param->allocated = true;
@@ -296,10 +297,10 @@ void pst_parameter_fini(pst_parameter* param)
 {
     param->clear();
     if(param->name) {
-        allocator.free(param->name);
+        pst_free(param->name);
     }
     if(param->allocated) {
-        allocator.free(&allocator, param);
+        pst_free(param);
     }
 }
 

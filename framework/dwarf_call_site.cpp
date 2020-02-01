@@ -33,7 +33,7 @@ void pst_call_site_param_init(pst_call_site_param* param)
 
 pst_call_site_param* pst_call_site_param_new()
 {
-    pst_call_site_param* param = (pst_call_site_param*)allocator.alloc(&allocator, sizeof(pst_call_site_param));
+    pst_call_site_param* param = pst_alloc(pst_call_site_param);
     if(param) {
         pst_call_site_param_init(param);
         param->allocated = true;
@@ -45,12 +45,12 @@ pst_call_site_param* pst_call_site_param_new()
 void pst_call_site_param_fini(pst_call_site_param* param)
 {
     if(param->name) {
-        allocator.free(&allocator, param->name);
+        pst_free(param->name);
         param->name = NULL;
     }
 
     if(param->allocated) {
-        allocator.free(&allocator, param);
+        pst_free(param);
     }
 }
 
@@ -165,7 +165,7 @@ void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const
 
 pst_call_site* pst_call_site_new(pst_context* c, uint64_t tgt, const char* orn)
 {
-    pst_call_site* nc = (pst_call_site*)allocator.alloc(&allocator, sizeof(pst_call_site));
+    pst_call_site* nc = pst_alloc(pst_call_site);
     if(nc) {
         pst_call_site_init(nc, c, tgt, orn);
         nc->allocated = true;
@@ -177,12 +177,12 @@ pst_call_site* pst_call_site_new(pst_context* c, uint64_t tgt, const char* orn)
 void pst_call_site_fini(pst_call_site* site)
 {
     if(site->origin) {
-        allocator.free(&allocator, site->origin);
+        pst_free(site->origin);
         site->origin = NULL;
     }
 
     if(site->allocated) {
-        allocator.free(&allocator, site);
+        pst_free(site);
     }
 }
 
