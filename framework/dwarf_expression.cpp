@@ -9,6 +9,8 @@
 
 #include "dwarf_expression.h"
 #include "common.h"
+#include "allocator.h"
+#include "context.h"
 
 //
 // DWARF operation
@@ -42,7 +44,7 @@ void pst_dwarf_op_fini(pst_dwarf_op* dwop)
     assert(dwop);
 
     if(dwop->allocated) {
-        allocator.free(dwop);
+        allocator.free(&allocator, dwop);
     } else {
         dwop->operation = 0;
         dwop->arg1 = 0;

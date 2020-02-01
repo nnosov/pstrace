@@ -6,8 +6,10 @@
  */
 
 #include <dwarf.h>
+#include <elfutils/libdw.h>
 
 #include "dwarf_parameter.h"
+#include "dwarf_utils.h"
 
 //
 // pst_type
@@ -173,7 +175,7 @@ pst_type* param_next_type(pst_parameter* param, pst_type* t)
     return ret;
 }
 
-bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, __pst_function* fun)
+bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun)
 {
     param->die = result;
 

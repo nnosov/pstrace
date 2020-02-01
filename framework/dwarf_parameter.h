@@ -35,7 +35,7 @@ typedef struct pst_parameter{
     void            (*clear) (pst_parameter* param);
     pst_type*       (*add_type) (pst_parameter* param, const char* name, int type);
     pst_type*       (*next_type) (pst_parameter* param, pst_type* t);
-    bool            (*handle_dwarf) (pst_parameter* param, Dwarf_Die* d, __pst_function* fun);
+    bool            (*handle_dwarf) (pst_parameter* param, Dwarf_Die* d, pst_function* fun);
     bool            (*handle_type) (pst_parameter* param, Dwarf_Attribute* attr);
     bool            (*print_dwarf) (pst_parameter* param);
 
