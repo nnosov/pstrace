@@ -251,7 +251,6 @@ bool handler_unwind(pst_handler* h)
             }
             //get_frame(fun);
         }
-        pst_log(SEVERITY_DEBUG, "fname = %s", fn->name);
         h->ctx.print(&h->ctx, "\n");
     }
 

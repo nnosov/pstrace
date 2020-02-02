@@ -352,7 +352,6 @@ bool fn_unwind(pst_function* fn, Dwarf_Addr addr)
         free(demangle_name);
     }
 
-    pst_log(SEVERITY_DEBUG, "func_name = %s", fn->name);
     return true;
 }
 
