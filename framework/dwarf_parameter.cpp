@@ -204,7 +204,6 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
             param->has_value = true;
         } else {
             pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", param->ctx->buff);
-            return false;
         }
     } else if(dwarf_hasattr(result, DW_AT_const_value)) {
         // no locations definitions, value is constant, known by DWARF directly
