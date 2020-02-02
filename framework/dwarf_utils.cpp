@@ -35,6 +35,7 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, pst_dwarf_expr* lo
             loc->setup(loc, expr, exprlen);
             ctx->print_expr(ctx, expr, exprlen, attr);
             ret = stack.calc(&stack, expr, exprlen, attr, fun);
+            stack.get_value(&stack, &loc->value);
         }
     } else if(dwarf_hasform(attr, DW_FORM_sec_offset)) {
         // Location list (loclist class of location in DWARF terms)
@@ -48,6 +49,7 @@ bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, pst_dwarf_expr* lo
                 loc->setup(loc, expr, exprlen);
                 // actual location, try to calculate Location expression
                 ret = stack.calc(&stack, expr, exprlen, attr, fun);
+                stack.get_value(&stack, &loc->value);
             } else {
                 // Location skipped due to don't match current PC offset
                 pst_log(SEVERITY_DEBUG, "Skip Location list expression: [%d] (low_offset: 0x%" PRIx64 ", high_offset: 0x%" PRIx64 "), \"%s\"", i, start, end, ctx->buff);
