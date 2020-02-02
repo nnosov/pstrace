@@ -9,7 +9,6 @@
 #define SC_SYSUTILS_H_
 
 //system
-#include <string>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>

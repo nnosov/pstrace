@@ -49,7 +49,7 @@ SRC 		= $(shell find . -name '*.cpp')
 #OBJ 		= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 OBJ 		= $(BUILD_DIR)/main.o
 
-LIBS 		= -L./ -lpthread -luuid -ldl -ldw -lunwind -lunwind-x86_64
+LIBS 		= -L./ -lpthread -luuid -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++
 ATR_LIBS	= ./build/libframework.a
 
 INCS		= -I./ \

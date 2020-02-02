@@ -6,6 +6,7 @@
  */
 
 #include <dwarf.h>
+#include <stdlib.h>
 #include <cxxabi.h>
 
 #include "dwarf_function.h"
