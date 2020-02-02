@@ -71,7 +71,7 @@ void pst_dwarf_value_init(pst_dwarf_value* dv, char* v, uint32_t s, int t)
     dv->type = t;
     dv->allocated = false;
     dv->set = value_set;
-    memcpy(&dv->value, v, s);
+    value_set(dv, v, s, t);
 }
 
 pst_dwarf_value* pst_dwarf_value_new(char* v, uint32_t s, int t)
@@ -154,6 +154,8 @@ bool stack_get_value(pst_dwarf_stack* st, uint64_t* value)
     } else if(v->type & DWARF_TYPE_MEMORY_LOC) {
         // dereference memory location
         *value = *((uint64_t*)v->value.uint64);
+    } else {
+        *value = v->value.uint64;
     }
 
     return true;
