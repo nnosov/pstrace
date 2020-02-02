@@ -57,7 +57,7 @@ typedef struct pst_call_site {
     pst_call_site_param*    (*add_param)    (pst_call_site* site);
     void                    (*del_param)    (pst_call_site* site, pst_call_site_param* p);
     pst_call_site_param*    (*next_param)   (pst_call_site* site, pst_call_site_param* p);
-    pst_call_site_param*    (*find_param)   (pst_call_site* site, pst_dwarf_expr& expr);
+    pst_call_site_param*    (*find_param)   (pst_call_site* site, pst_dwarf_expr* expr);
     bool                    (*handle_dwarf) (pst_call_site* site, Dwarf_Die* die);
 
     // fields
@@ -78,7 +78,7 @@ typedef struct __pst_function pst_function;
 // -----------------------------------------------------------------------------------
 typedef struct pst_call_site_storage {
     // methods
-    bool                (*handle_dwarf) (pst_call_site_storage* storage, Dwarf_Die* result);
+    bool                (*handle_dwarf) (pst_call_site_storage* storage, Dwarf_Die* result, pst_function* info);
     pst_call_site*      (*add_call_site) (pst_call_site_storage* storage, uint64_t target, const char* origin);
     void                (*del_call_site)   (pst_call_site_storage* storage, pst_call_site* site);
     pst_call_site*      (*find_call_site) (pst_call_site_storage* storage, pst_function* callee);

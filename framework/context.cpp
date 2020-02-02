@@ -73,11 +73,6 @@ bool print(pst_context* ctx, const char* fmt, ...)
     return nret;
 }
 
-void log(SC_LogSeverity severity, const char* fmt, ...)
-{
-    pst_log(severity, fmt);
-}
-
 bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr)
 {
     ctx->clean_print(ctx);
@@ -162,14 +157,12 @@ void pst_context_init(pst_context* ctx, ucontext_t* hctx)
     // methods
     ctx->clean_print = clean_print;
     ctx->print = print;
-    ctx->log = log;
     ctx->print_expr = print_expr_block;
     ctx->print_registers = print_registers;
     ctx->print_stack = print_stack;
 
     // fields
     ctx->hcontext = hctx;
-    ctx->clean_print(ctx);
     ctx->base_addr = 0;
     ctx->sp = 0;
     ctx->cfa = 0;

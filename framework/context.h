@@ -31,7 +31,6 @@ typedef struct pst_context {
     // methods
     void (*clean_print)     (pst_context* ctx);
     bool (*print)           (pst_context* ctx, const char* fmt, ...);
-    void (*log)             (SC_LogSeverity severity, const char*fmt, ...);
     bool (*print_expr)      (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr);
     void (*print_registers) (pst_context* ctx, int from, int to);
     void (*print_stack)     (pst_context* ctx, int max, uint64_t next_cfa);

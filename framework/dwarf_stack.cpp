@@ -227,7 +227,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                     pst_dwarf_expr loc;
                     pst_dwarf_expr_init(&loc);
                     loc.setup(&loc, expr, exprlen);
-                    pst_call_site_param* param = cs->find_param(cs, loc);
+                    pst_call_site_param* param = cs->find_param(cs, &loc);
                     pst_dwarf_expr_fini(&loc);
                     if(!param) {
                         pst_log(SEVERITY_ERROR, "Failed to find call site parameter while calculate DW_OP_GNU_entry_value expression");
@@ -261,6 +261,7 @@ void pst_dwarf_stack_init(pst_dwarf_stack* st, pst_context* ctx)
 {
     pst_assert(st && ctx);
 
+    list_head_init(&st->expr);
     list_head_init(&st->values);
     st->push = stack_push;
     st->push_value = stack_push_value;

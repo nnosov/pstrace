@@ -167,7 +167,7 @@ bool fn_handle_lexical_block(pst_function* fn, Dwarf_Die* result)
                     break;
                 }
                 case DW_TAG_GNU_call_site:
-                    fn->call_sites.handle_dwarf(&fn->call_sites, &child);
+                    fn->call_sites.handle_dwarf(&fn->call_sites, &child, fn);
                     break;
                 case DW_TAG_inlined_subroutine:
                     pst_log(SEVERITY_DEBUG, "Skipping Lexical block tag 'DW_TAG_inlined_subroutine'");
@@ -192,8 +192,8 @@ bool fn_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 
     // get list of offsets from process base address of continuous memory ranges where function's code resides
 //  if(dwarf_haspc(d, pc)) {
-        dwarf_lowpc(d, &fn->lowpc);
-        dwarf_highpc(d, &fn->highpc);
+    dwarf_lowpc(d, &fn->lowpc);
+    dwarf_highpc(d, &fn->highpc);
 //  } else {
 //      pst_log(SEVERITY_ERROR, "Function's '%s' DIE hasn't definitions of memory offsets of function's code", dwarf_diename(d));
 //      return false;
@@ -281,7 +281,7 @@ bool fn_handle_dwarf(pst_function * fn, Dwarf_Die* d)
                 break;
             }
             case DW_TAG_GNU_call_site:
-                fn->call_sites.handle_dwarf(&fn->call_sites, &result);
+                fn->call_sites.handle_dwarf(&fn->call_sites, &result, fn);
                 break;
 
                 //              case DW_TAG_inlined_subroutine:
@@ -344,7 +344,7 @@ bool fn_unwind(pst_function* fn, Dwarf_Addr addr)
         if(str) {
             *str = 0;
         }
-        fn->name = function_name;
+        fn->name = pst_strdup(function_name);
         free(function_name);
     }
 
@@ -352,6 +352,7 @@ bool fn_unwind(pst_function* fn, Dwarf_Addr addr)
         free(demangle_name);
     }
 
+    pst_log(SEVERITY_DEBUG, "func_name = %s", fn->name);
     return true;
 }
 
@@ -407,8 +408,9 @@ bool fn_get_frame(pst_function* fn)
     }
 
     fn->ctx->print_expr(fn->ctx, cfa_ops, cfa_nops, NULL);
+
     pst_decl(pst_dwarf_stack, stack, fn->ctx);
-    if(stack.calc(&stack, cfa_ops, cfa_nops, NULL, fn) && stack.get_value(&stack, &fn->cfa)) {
+    if(stack.calc(&stack, cfa_ops, cfa_nops, NULL, NULL) && stack.get_value(&stack, &fn->cfa)) {
         pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->name, fn->ctx->buff, fn->cfa);
 
         // setup context to match CFA for frame
@@ -444,7 +446,7 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, __pst_function* _par
     fn->die = NULL;
     fn->name = NULL;
     list_head_init(&fn->params);
-    pst_call_site_storage_init(&fn->call_sites, fn->ctx);
+    pst_call_site_storage_init(&fn->call_sites, _ctx);
 
     fn->sp = 0;
     fn->cfa = 0;

@@ -42,18 +42,18 @@ bool handler_get_dwarf_function(pst_handler* h, pst_function* fun)
     Dwarf_Die* cdie = dwfl_module_addrdie(h->ctx.module, fun->pc, &mod_cu);
     //Dwarf_Die* cdie = dwfl_addrdie(dwfl, addr, &mod_bias);
     if(!cdie) {
-        h->ctx.log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", fun->pc);
+        pst_log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", fun->pc);
     	return false;
     }
 
     if(dwarf_tag(cdie) != DW_TAG_compile_unit) {
-        h->ctx.log(SEVERITY_DEBUG, "Skipping non-cu die. DWARF tag: 0x%X, name = %s", dwarf_tag(cdie), dwarf_diename(cdie));
+        pst_log(SEVERITY_DEBUG, "Skipping non-cu die. DWARF tag: 0x%X, name = %s", dwarf_tag(cdie), dwarf_diename(cdie));
     	return false;
     }
 
     Dwarf_Die result;
 	if(dwarf_child(cdie, &result)) {
-	    h->ctx.log(SEVERITY_ERROR, "No child DIE found for CU %s", dwarf_diename(cdie));
+	    pst_log(SEVERITY_ERROR, "No child DIE found for CU %s", dwarf_diename(cdie));
 		return false;
 	}
 
@@ -134,9 +134,9 @@ bool handler_handle_dwarf(pst_handler* h)
     Dl_info info;
 
     //for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
-    for(pst_function* fun = (pst_function*)handler_last_function(h); fun; fun = h->prev_function(h, fun)) {
+    for(pst_function* fun = handler_last_function(h); fun; fun = h->prev_function(h, fun)) {
         dladdr((void*)(fun->pc), &info);
-        h->ctx.log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
+        pst_log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
 
         // setup context
         h->ctx.module       = dwfl_addrmodule(h->ctx.dwfl, fun->pc);
@@ -180,7 +180,7 @@ bool handler_unwind(pst_handler* h)
 #ifdef REG_RIP // x86_64
     h->caller = (void *) h->ctx.hcontext->uc_mcontext.gregs[REG_RIP];
     h->ctx.sp = h->ctx.hcontext->uc_mcontext.gregs[REG_RSP];
-    h->ctx.log(SEVERITY_DEBUG, "Original caller's SP: %#lX", h->ctx.sp);
+    pst_log(SEVERITY_DEBUG, "Original caller's SP: %#lX", h->ctx.sp);
 #elif defined(REG_EIP) // x86_32
     caller_address = (void *) uctx->uc_mcontext.gregs[REG_EIP]);
 #elif defined(__arm__)
@@ -201,7 +201,7 @@ bool handler_unwind(pst_handler* h)
 	Dl_info info;
 	dladdr(h->caller, &info);
 	h->ctx.base_addr = (uint64_t)info.dli_fbase;
-	h->ctx.log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", h->caller, info.dli_fbase, info.dli_fname);
+	pst_log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", h->caller, info.dli_fbase, info.dli_fname);
 
 	h->ctx.dwfl = dwfl_begin(&callbacks);
     if(h->ctx.dwfl == NULL) {
@@ -221,19 +221,19 @@ bool handler_unwind(pst_handler* h)
     h->ctx.curr_frame = &h->ctx.cursor;
     for(int i = 0, skip = 1; unw_step(h->ctx.curr_frame) > 0; ++i) {
         if(unw_get_reg(h->ctx.curr_frame, UNW_REG_IP,  &h->addr)) {
-            h->ctx.log(SEVERITY_DEBUG, "Failed to get IP value");
+            pst_log(SEVERITY_DEBUG, "Failed to get IP value");
             continue;
         }
         unw_word_t  sp;
         if(unw_get_reg(h->ctx.curr_frame, UNW_REG_SP,  &sp)) {
-            h->ctx.log(SEVERITY_DEBUG, "Failed to get SP value");
+            pst_log(SEVERITY_DEBUG, "Failed to get SP value");
             continue;
         }
 
         if(h->addr == (uint64_t)h->caller) {
             skip = 0;
         } else if(skip) {
-            h->ctx.log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
+            pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
             continue;
         }
 
@@ -242,7 +242,7 @@ bool handler_unwind(pst_handler* h)
         pst_function* last = handler_last_function(h);
         pst_function* fn = h->add_function(h, NULL);
         fn->sp = sp;
-        h->ctx.log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
+        pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
         if(!fn->unwind(fn, h->addr)) {
             h->del_function(fn);
         } else {
@@ -251,6 +251,7 @@ bool handler_unwind(pst_handler* h)
             }
             //get_frame(fun);
         }
+        pst_log(SEVERITY_DEBUG, "fname = %s", fn->name);
         h->ctx.print(&h->ctx, "\n");
     }
 
@@ -265,6 +266,9 @@ void pst_handler_init(pst_handler* h, ucontext_t* hctx)
     h->del_function = handler_del_function;
     h->next_function = handler_next_function;
     h->prev_function = handler_prev_function;
+    h->handle_dwarf = handler_handle_dwarf;
+    h->print_dwarf = handler_print_dwarf;
+    h->unwind = handler_unwind;
 
     // fields
     pst_context_init(&h->ctx, hctx);

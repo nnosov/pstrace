@@ -150,7 +150,11 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
 void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const char* orn)
 {
     // methods
-
+    site->add_param = site_add_param;
+    site->del_param = site_del_param;
+    site->next_param = site_next_param;
+    site->find_param = site_find_param;
+    site->handle_dwarf = site_handle_dwarf;
 
     // fields
     list_node_init(&site->node);
@@ -330,6 +334,14 @@ pst_call_site* storage_find_call_site(pst_call_site_storage* storage, pst_functi
 
 void pst_call_site_storage_init(pst_call_site_storage* storage, pst_context* ctx)
 {
+    // methods
+    storage->handle_dwarf = storage_handle_dwarf;
+    storage->add_call_site = storage_add_call_site;
+    storage->del_call_site = storage_del_call_site;
+    storage->find_call_site = storage_find_call_site;
+    storage->next_call_site = storage_next_call_site;
+
+    // fields
     storage->ctx = ctx;
     list_head_init(&storage->call_sites);
     hash_head_init(&storage->cs_to_target);
