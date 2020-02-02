@@ -31,9 +31,9 @@
 */
 typedef struct hash_node
 {
+    list_node   node;
     char*       key;
     int         key_size;
-    list_node   node;
 } hash_node;
 
 /** Hash function prototype

@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "linkedlist.h"
-
 #include "context.h"
 
 typedef struct __dwarf_reg_map {

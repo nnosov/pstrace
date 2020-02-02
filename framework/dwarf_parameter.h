@@ -55,7 +55,9 @@ typedef struct pst_parameter{
 
     bool            allocated;
 } pst_parameter;
-
+void pst_parameter_init(pst_parameter* param, pst_context* ctx);
+pst_parameter* pst_parameter_new(pst_context* ctx);
+void pst_parameter_fini(pst_parameter* param);
 
 
 #endif /* FRAMEWORK_DWARF_PARAMETER_H_ */

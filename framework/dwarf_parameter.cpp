@@ -256,7 +256,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
     return true;
 }
 
-void pst_parameter_init(pst_parameter*param, pst_context* ctx)
+void pst_parameter_init(pst_parameter* param, pst_context* ctx)
 {
     // methods
     param->clear = param_clear;

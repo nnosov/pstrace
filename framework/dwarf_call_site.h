@@ -88,5 +88,7 @@ typedef struct pst_call_site_storage {
 
 void pst_call_site_storage_init(pst_call_site_storage* storage, pst_context* ctx);
 pst_call_site_storage* pst_call_site_storage_new(pst_context* ctx);
+void pst_call_site_storage_fini(pst_call_site_storage* storage);
+
 
 #endif /* FRAMEWORK_DWARF_CALL_SITE_H_ */

@@ -255,7 +255,7 @@ pst_call_site* storage_call_site_by_origin(pst_call_site_storage* storage, const
     pst_call_site* ret = NULL;
     hash_node* node = hash_find(&storage->cs_to_origin, origin, strlen(origin));
     if(node) {
-        ret = hash_entry(node, pst_call_site, node);
+        ret = hash_entry(node, pst_call_site, org_node);
     }
 
     return ret;
@@ -266,7 +266,7 @@ pst_call_site* storage_call_site_by_target(pst_call_site_storage* storage, uint6
     pst_call_site* ret = NULL;
     hash_node* node = hash_find(&storage->cs_to_target, (char*)&target, sizeof(target));
     if(node) {
-        ret = hash_entry(node, pst_call_site, node);
+        ret = hash_entry(node, pst_call_site, tgt_node);
     }
 
     return ret;
@@ -320,7 +320,7 @@ pst_call_site* storage_find_call_site(pst_call_site_storage* storage, pst_functi
     uint64_t start_pc = storage->ctx->base_addr + callee->lowpc;
     pst_call_site* cs = storage_call_site_by_target(storage, start_pc);
     if(!cs) {
-        cs = storage_call_site_by_origin(storage, callee->name.c_str());
+        cs = storage_call_site_by_origin(storage, callee->name);
     }
 
     return cs;
@@ -348,5 +348,14 @@ pst_call_site_storage* pst_call_site_storage_new(pst_context* ctx)
 
 void pst_call_site_storage_fini(pst_call_site_storage* storage)
 {
+    pst_call_site*  site = NULL;
+    struct list_node  *pos, *tn;
+    list_for_each_entry_safe(site, pos, tn, &storage->call_sites, node) {
+        list_del(&site->node);
+        pst_call_site_fini(site);
+    }
 
+    if(storage->allocated) {
+        pst_free(storage);
+    }
 }

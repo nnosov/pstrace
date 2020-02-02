@@ -20,32 +20,31 @@
 typedef struct __pst_function {
     list_node           node;       // uplink. !!! must be first !!!
 
-    void clear();
-    pst_parameter* add_param();
-    void del_param(pst_parameter* p);
-    pst_parameter* next_param(pst_parameter* p);
+    void clear(pst_function* fn);
+    pst_parameter* add_param(pst_function* fn);
+    void del_param(pst_function* fn, pst_parameter* p);
+    pst_parameter* next_param(pst_function* fn, pst_parameter* p);
 
-    bool unwind(Dwarf_Addr addr);
-    bool handle_dwarf(Dwarf_Die* d);
-    bool print_dwarf();
-    bool handle_lexical_block(Dwarf_Die* result);
+    bool unwind(pst_function* fn, Dwarf_Addr addr);
+    bool handle_dwarf(pst_function* fn, Dwarf_Die* d);
+    bool print_dwarf(pst_function* fn);
+    bool handle_lexical_block(pst_function* fn, Dwarf_Die* result);
 
-    bool get_frame();
+    bool get_frame(pst_function* fn);
 
     Dwarf_Addr              lowpc;      // offset to start of the function against base address
     Dwarf_Addr              highpc;     // offset to the next address after the end of the function against base address
+    unw_word_t              pc;         // address between LowPC & HighPC (plus base address offset). actually, currently executed command
     Dwarf_Die*              die;        // DWARF DIE containing definition of the function
-    std::string             name;       // function's name
-    SC_ListHead             params;     // function's parameters
-
+    char*                   name;       // function's name
+    list_head               params;     // function's parameters
     pst_call_site_storage   call_sites;
 
-    unw_word_t              pc;         // address between LowPC & HighPC (plus base address offset). actually, currently executed command
     unw_word_t              sp;         // SP register in function's frame
     unw_word_t              cfa;        // CFA (Canonical Frame Address) of the function
     unw_cursor_t            cursor;     // copy of stack state of the function
     int                     line;       // line in code where function is defined
-    std::string             file;       // file name (DWARF Compilation Unit) where function is defined
+    char*                   file;       // file name (DWARF Compilation Unit) where function is defined
     __pst_function*         parent;     // parent function in call trace (caller)
     Dwarf_Frame*            frame;      // function's stack frame
     pst_context*            ctx;        // context of unwinding
