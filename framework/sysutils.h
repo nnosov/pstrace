@@ -32,43 +32,27 @@
 #include "dwarf_utils.h"
 #include "dwarf_function.h"
 
-typedef struct __pst_handler {
-	__pst_handler(ucontext_t* hctx)
-	{
-		pst_context_init(&ctx, hctx);
-		caller = NULL;
-		frame = NULL;
-		addr = 0;
-		handle = 0;
-	}
+typedef struct pst_handler {
+    // methods
+    void                    (*clear) (pst_handler* h);
+    pst_function*           (*add_function) (pst_handler* h, pst_function* fun);
+    void                    (*del_function) (pst_function* f);
+    pst_function*           (*next_function) (pst_handler* h, pst_function* f);
+    pst_function*           (*prev_function) (pst_handler* h, pst_function* fn);
 
-	~__pst_handler()
-	{
-		if(handle) {
-			dlclose(handle);
-		}
+    bool                    (*handle_dwarf) (pst_handler* h);
+	void                    (*print_dwarf) (pst_handler* h);
+	bool                    (*unwind) (pst_handler* h);
 
-		clear();
-		pst_context_fini(&ctx);
-	}
-
-    void clear();
-    pst_function* add_function(pst_function* fun);
-    void del_function(pst_function* f);
-    pst_function* next_function(pst_function* f);
-    pst_function* last_function();
-
-    bool handle_dwarf();
-	void print_dwarf();
-	bool unwind();
-	bool get_dwarf_function(pst_function* fun);
-
+	// fields
 	pst_context					ctx;		// context of unwinding
 	void*						handle;		// process handle
 	Dwarf_Addr 					addr;		// address of currently processed function
 	Dwarf_Frame* 				frame;		// currently processed stack frame
 	void*						caller;		// pointer to the function which requested to unwind stack
-	SC_ListHead	                functions;	// list of functions in stack frame
+	list_head	                functions;	// list of functions in stack frame
 } pst_handler;
+void pst_handler_init(pst_handler* h, ucontext_t* hctx);
+void pst_handler_fini(pst_handler* h);
 
 #endif /* SC_SYSUTILS_H_ */

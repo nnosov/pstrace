@@ -178,7 +178,6 @@ void stack_clear(pst_dwarf_stack* st)
 bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun = NULL)
 {
     st->clear(st);
-    bool nret = true;
 
     for (int i = 0; i < expr_len; i++) {
         const dwarf_op_map* map = find_op_map(exprs[i].atom);
@@ -220,7 +219,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                 Dwarf_Op *expr;
                 size_t exprlen;
                 if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
-                    pst_call_site* cs = fun->parent->find_call_site(fun);
+                    pst_call_site* cs = fun->parent->call_sites.find_call_site(&fun->parent->call_sites, fun);
                     if(!cs) {
                         pst_log(SEVERITY_ERROR, "Failed to find call site while calculate DW_OP_GNU_entry_value expression");
                         return false;
@@ -228,7 +227,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                     pst_dwarf_expr loc;
                     pst_dwarf_expr_init(&loc);
                     loc.setup(&loc, expr, exprlen);
-                    pst_call_site_param* param = cs->find_param(loc);
+                    pst_call_site_param* param = cs->find_param(cs, loc);
                     pst_dwarf_expr_fini(&loc);
                     if(!param) {
                         pst_log(SEVERITY_ERROR, "Failed to find call site parameter while calculate DW_OP_GNU_entry_value expression");
@@ -240,8 +239,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                     continue;
                 } else {
                     pst_log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr location");
-                    nret = false;
-                    break;
+                    return false;
                 }
             } else {
                 pst_log(SEVERITY_ERROR, "Failed to get DW_OP_GNU_entry_value attr expression");

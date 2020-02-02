@@ -59,14 +59,14 @@ bool expr_is_equal(pst_dwarf_expr* lhs, pst_dwarf_expr* rhs)
         return false;
     }
 
-    pst_dwarf_op* lop = lhs->next_op(NULL);
-    pst_dwarf_op* rop = rhs->next_op(NULL);
+    pst_dwarf_op* lop = lhs->next_op(lhs, NULL);
+    pst_dwarf_op* rop = rhs->next_op(rhs, NULL);
     while(lop && rop) {
         if(lop->operation == rop->operation && lop->arg1 == rop->arg1 && lop->arg2 == rop->arg2) {
             return true;
         }
-        lop = lhs->next_op(lop);
-        rop = rhs->next_op(rop);
+        lop = lhs->next_op(lhs, lop);
+        rop = rhs->next_op(rhs, rop);
     }
 
     return false;
@@ -127,7 +127,7 @@ void expr_clean(pst_dwarf_expr* expr)
 
 void expr_setup(pst_dwarf_expr* expr, Dwarf_Op* exprs, size_t exprlen)
 {
-    expr->clean();
+    expr->clean(expr);
     for(size_t i = 0; i < exprlen; ++i) {
         expr->add_op(expr, exprs[i].atom, exprs[i].number, exprs[i].number2);
     }
@@ -167,7 +167,7 @@ pst_dwarf_expr* pst_dwarf_expr_new()
 
 void pst_dwarf_expr_fini(pst_dwarf_expr* expr)
 {
-    expr->clean();
+    expr->clean(expr);
     if(expr->allocated) {
         pst_free(expr);
     }

@@ -6,11 +6,13 @@
  */
 
 #include <dwarf.h>
+#include <elfutils/libdw.h>
 
 #include "dwarf_call_site.h"
 #include "dwarf_utils.h"
 #include "hash_multimap.h"
 #include "dwarf_utils.h"
+#include "dwarf_function.h"
 
 // -----------------------------------------------------------------------------------
 // pst_call_site_param
@@ -203,7 +205,7 @@ void pst_call_site_fini(pst_call_site* site)
 // DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
 // relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
 // get DIE of return type
-bool storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result)
+bool storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result, pst_function* info)
 {
     Dwarf_Die origin;
     Dwarf_Attribute attr_mem;
@@ -225,7 +227,7 @@ bool storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result)
         if(attr) {
             pst_dwarf_expr expr;
             pst_dwarf_expr_init(&expr);
-            if(handle_location(storage->ctx, &attr_mem, expr, pc, this)) {
+            if(handle_location(storage->ctx, &attr_mem, &expr, info->pc, info)) {
                 target = expr.value;
                 pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %#lX", target);
             }
@@ -280,7 +282,7 @@ pst_call_site* storage_add_call_site(pst_call_site_storage* storage, uint64_t ta
     if(target) {
         hash_add(&storage->cs_to_target, &st->tgt_node, &target, sizeof(target));
     } else if(origin) {
-        hash_add(&storage->cs_to_origin, &st->org_node, (char*)origin, strlen(origin));
+        hash_add(&storage->cs_to_origin, &st->org_node, origin, strlen(origin));
     }
 
     return st;

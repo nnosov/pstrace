@@ -21,15 +21,4 @@ typedef enum {
     REG_EXPR_ERROR
 } pst_reg_error;
 
-typedef struct __pst_frame : public SC_ListNode {
-    __pst_frame() {
-        memset(reg_state, REG_UNDEFINED, sizeof(reg_state));
-        memset(regs, 0, sizeof(regs));
-        cfa = 0;
-    }
-    int32_t     reg_state[128];
-    uint64_t    regs[128];
-    uint64_t    cfa;
-} pst_frame;
-
 pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t& regval);

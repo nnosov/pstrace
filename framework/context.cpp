@@ -202,7 +202,7 @@ char* pst_strdup(const char* str)
     pst_assert(str);
 
     uint32_t len = strlen(str);
-    char* dst = (char*)allocator.alloc(len + 1);
+    char* dst = (char*)allocator.alloc(&allocator, len + 1);
     memcpy(dst, str, len);
     dst[len] = 0;
 

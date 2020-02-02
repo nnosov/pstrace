@@ -68,6 +68,7 @@ $(ATR_LIBS):
 
 clean:
 	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h
+	@make clean -C ./framework
 	@if [ -z "$$(ls -A $(BUILD_DIR) 2>&1)" ]; then ${RM} -r $(BUILD_DIR); fi
 	@if [ -z "$$(ls -A $(RESULT_DIR) 2>&1)" ]; then ${RM} -r $(RESULT_DIR); fi
 

@@ -16,6 +16,12 @@
 #include "dwarf_expression.h"
 #include "hash_multimap.h"
 
+typedef struct pst_callee_info {
+    Dwarf_Addr      target;
+    char*           origin;
+    Dwarf_Addr      pc;
+} pst_callee_info;
+
 
 // -----------------------------------------------------------------------------------
 // DW_TAG_call_site_parameter
@@ -66,7 +72,7 @@ void pst_call_site_init(pst_call_site* site, pst_context* context, uint64_t targ
 pst_call_site* pst_call_site_new(pst_context* context, uint64_t target, const char* origin);
 void pst_call_site_fini(pst_call_site* site);
 
-
+typedef struct __pst_function pst_function;
 // -----------------------------------------------------------------------------------
 // storage for all of  function's call sites
 // -----------------------------------------------------------------------------------

@@ -77,7 +77,7 @@ void log_init_base(pst_log* plog, const char* source)
     plog->child = 0;
 }
 
-void log_fini(pst_log* log)
+void pst_log_fini(pst_log* log)
 {
     pthread_mutex_destroy(&log->mLock);
     log->close(log);
@@ -133,7 +133,7 @@ bool is_opened_console(pst_log* log) {
     return true;
 }
 
-void pst_init_console(pst_log* log)
+void pst_log_init_console(pst_log* log)
 {
     log_init_base(log, NULL);
     log->close = close_console;

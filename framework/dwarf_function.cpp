@@ -71,7 +71,7 @@ bool fn_print_dwarf(pst_function* fn)
     pst_parameter* param = fn->next_param(fn, NULL);
     if(param && param->is_return) {
         // print return value type, function name and start list of parameters
-        param->print_dwarf();
+        param->print_dwarf(param);
         fn->ctx->print(fn->ctx, " %s(", fn->name);
         param = fn->next_param(fn, param);
     } else {
@@ -82,7 +82,7 @@ bool fn_print_dwarf(pst_function* fn)
     for(; param; param = fn->next_param(fn, param)) {
         if(param->is_return) {
             // print return value type, function name and start list of parameters
-            param->print_dwarf();
+            param->print_dwarf(param);
             fn->ctx->print(fn->ctx, " %s(", fn->name);
             continue;
         }
@@ -98,7 +98,7 @@ bool fn_print_dwarf(pst_function* fn)
             } else {
                 fn->ctx->print(fn->ctx, "        ");
             }
-            param->print_dwarf();
+            param->print_dwarf(param);
             fn->ctx->print(fn->ctx, ";\n");
         } else {
             if(first) {
@@ -106,7 +106,7 @@ bool fn_print_dwarf(pst_function* fn)
             } else {
                 fn->ctx->print(fn->ctx, ", ");
             }
-            param->print_dwarf();
+            param->print_dwarf(param);
         }
     }
 
@@ -160,8 +160,8 @@ bool fn_handle_lexical_block(pst_function* fn, Dwarf_Die* result)
                     break;
                 case DW_TAG_variable: {
                     pst_parameter* param = fn->add_param(fn);
-                    if(!param->handle_dwarf(&child, fn)) {
-                        fn->del_param(fn, param);
+                    if(!param->handle_dwarf(param, &child, fn)) {
+                        fn->del_param(param);
                     }
                     break;
                 }
@@ -217,7 +217,7 @@ bool fn_handle_dwarf(pst_function * fn, Dwarf_Die* d)
             if (dwarf_getlocation (attr, &expr, &exprlen) == 0) {
                 fn->ctx->print_expr(fn->ctx, expr, exprlen, attr);
                 pst_decl(pst_dwarf_stack, stack, fn->ctx);
-                if(stack.calc(&stack, expr, exprlen, attr, this)) {
+                if(stack.calc(&stack, expr, exprlen, attr, fn)) {
                     uint64_t value;
                     if(stack.get_value(&stack, &value)) {
                         pst_log(SEVERITY_DEBUG, "DW_AT_framebase expression: \"%s\" ==> 0x%lX", fn->ctx->buff, value);
@@ -239,12 +239,12 @@ bool fn_handle_dwarf(pst_function * fn, Dwarf_Die* d)
     pst_parameter* ret_p = fn->add_param(fn); ret_p->is_return = true;
     attr = dwarf_attr(fn->die, DW_AT_type, &attr_mem);
     if(attr) {
-        if(!ret_p->handle_type(attr)) {
+        if(!ret_p->handle_type(ret_p, attr)) {
             pst_log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", fn->name);
-            fn->del_param(fn, ret_p);
+            fn->del_param(ret_p);
         }
     } else {
-        ret_p->add_type("void", 0);
+        ret_p->add_type(ret_p, "void", 0);
     }
 
     // handle and save additionally these attributes:
@@ -274,7 +274,7 @@ bool fn_handle_dwarf(pst_function * fn, Dwarf_Die* d)
             case DW_TAG_variable: {
                 pst_parameter* param = fn->add_param(fn);
                 if(!param->handle_dwarf(param, &result, fn)) {
-                    fn->del_param(fn, param);
+                    fn->del_param(param);
                 }
 
                 break;
@@ -318,7 +318,7 @@ bool fn_unwind(pst_function* fn, Dwarf_Addr addr)
             } else {
                 str = filename;
             }
-            fn->file = str;
+            fn->file = pst_strdup(str);
             fn->ctx->print(fn->ctx, "%s:%d", str, fn->line);
         } else {
             fn->ctx->print(fn->ctx, "%p", (void*)addr);
@@ -407,7 +407,7 @@ bool fn_get_frame(pst_function* fn)
 
     fn->ctx->print_expr(fn->ctx, cfa_ops, cfa_nops, NULL);
     pst_decl(pst_dwarf_stack, stack, fn->ctx);
-    if(stack.calc(&stack, cfa_ops, cfa_nops, NULL, this) && stack.get_value(&stack, &fn->cfa)) {
+    if(stack.calc(&stack, cfa_ops, cfa_nops, NULL, fn) && stack.get_value(&stack, &fn->cfa)) {
         pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->name, fn->ctx->buff, fn->cfa);
 
         // setup context to match CFA for frame
@@ -456,6 +456,17 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, __pst_function* _par
     fn->allocated = false;
 }
 
+pst_function* pst_function_new(pst_context* _ctx, __pst_function* _parent)
+{
+    pst_function* fn = pst_alloc(pst_function);
+    if(fn) {
+        pst_function_init(fn, _ctx, _parent);
+        fn->allocated = true;
+    }
+
+    return fn;
+}
+
 void pst_function_fini(pst_function* fn)
 {
     fn->clear(fn);
@@ -471,5 +482,9 @@ void pst_function_fini(pst_function* fn)
 
     if(fn->file) {
         pst_free(fn->file);
+    }
+
+    if(fn->allocated) {
+        pst_free(fn);
     }
 }
