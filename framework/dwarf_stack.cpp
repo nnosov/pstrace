@@ -13,7 +13,8 @@
 #include "list_head.h"
 
 #include "dwarf_stack.h"
-#include "sysutils.h"
+
+#include "dwarf_handler.h"
 #include "dwarf_operations.h"
 
 // -----------------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 #include <fcntl.h>
 
 #include "context.h"
-#include "sysutils.h"
+#include "dwarf_handler.h"
 
 typedef enum {
 	DEF_1 = 1,

@@ -39,8 +39,8 @@ typedef struct __pst_function {
     bool                    allocated;  // whether this object was allocated or not
 } pst_function;
 void pst_function_init(pst_function* fn, pst_context* _ctx, __pst_function* _parent);
-void pst_function_fini(pst_function* fn);
 pst_function* pst_function_new(pst_context* _ctx, __pst_function* _parent);
+void pst_function_fini(pst_function* fn);
 
 bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr);
 bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d);

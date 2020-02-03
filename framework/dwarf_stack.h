@@ -13,7 +13,7 @@
 #include "common.h"
 #include "allocator.h"
 #include "context.h"
-#include "sysutils.h"
+#include "dwarf_handler.h"
 
 // -----------------------------------------------------------------------------------
 // DWARF Stack value

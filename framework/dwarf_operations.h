@@ -4,8 +4,8 @@
 
 #include "common.h"
 #include "list_head.h"
-#include "sysutils.h"
 #include "context.h"
+#include "dwarf_handler.h"
 
 #include "dwarf_stack.h"
 

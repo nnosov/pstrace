@@ -19,7 +19,6 @@
 typedef struct pst_callee_info {
     Dwarf_Addr      target;
     char*           origin;
-    Dwarf_Addr      pc;
 } pst_callee_info;
 
 

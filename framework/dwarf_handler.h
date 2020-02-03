@@ -33,10 +33,6 @@
 
 typedef struct pst_handler {
 	pst_context					ctx;		// context of unwinding
-	void*						handle;		// process handle
-	Dwarf_Addr 					addr;		// address of currently processed function
-	Dwarf_Frame* 				frame;		// currently processed stack frame
-	void*						caller;		// pointer to the function which requested to unwind stack
 	list_head	                functions;	// list of functions in stack frame
 } pst_handler;
 void pst_handler_init(pst_handler* h, ucontext_t* hctx);

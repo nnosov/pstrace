@@ -16,7 +16,7 @@
 #include <dwarf.h>
 #include <inttypes.h>
 
-#include "sysutils.h"
+#include "dwarf_handler.h"
 #include "logger/log.h"
 
 #define USE_LIBUNWIND
@@ -177,8 +177,10 @@ Dwfl_Callbacks callbacks = {
 bool pst_handler_unwind(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
+    void*                       caller;     // pointer to the function which requested to unwind stack
+
 #ifdef REG_RIP // x86_64
-    h->caller = (void *) h->ctx.hcontext->uc_mcontext.gregs[REG_RIP];
+    caller = (void *) h->ctx.hcontext->uc_mcontext.gregs[REG_RIP];
     h->ctx.sp = h->ctx.hcontext->uc_mcontext.gregs[REG_RSP];
     pst_log(SEVERITY_DEBUG, "Original caller's SP: %#lX", h->ctx.sp);
 #elif defined(REG_EIP) // x86_32
@@ -199,9 +201,9 @@ bool pst_handler_unwind(pst_handler* h)
 
     //handle = dlopen(NULL, RTLD_NOW);
 	Dl_info info;
-	dladdr(h->caller, &info);
+	dladdr(caller, &info);
 	h->ctx.base_addr = (uint64_t)info.dli_fbase;
-	pst_log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", h->caller, info.dli_fbase, info.dli_fname);
+	pst_log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
 
 	h->ctx.dwfl = dwfl_begin(&callbacks);
     if(h->ctx.dwfl == NULL) {
@@ -214,13 +216,15 @@ bool pst_handler_unwind(pst_handler* h)
     	return false;
     }
 
-    h->ctx.print(&h->ctx, "Stack trace: caller = %p\n", h->caller);
+    h->ctx.print(&h->ctx, "Stack trace: caller = %p\n", caller);
 
     unw_getcontext(&h->ctx.context);
     unw_init_local(&h->ctx.cursor, &h->ctx.context);
     h->ctx.curr_frame = &h->ctx.cursor;
+
+    Dwarf_Addr addr; // address of currently processed function
     for(int i = 0, skip = 1; unw_step(h->ctx.curr_frame) > 0; ++i) {
-        if(unw_get_reg(h->ctx.curr_frame, UNW_REG_IP,  &h->addr)) {
+        if(unw_get_reg(h->ctx.curr_frame, UNW_REG_IP,  &addr)) {
             pst_log(SEVERITY_DEBUG, "Failed to get IP value");
             continue;
         }
@@ -230,20 +234,20 @@ bool pst_handler_unwind(pst_handler* h)
             continue;
         }
 
-        if(h->addr == (uint64_t)h->caller) {
+        if(addr == (uint64_t)caller) {
             skip = 0;
         } else if(skip) {
-            pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
+            pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
             continue;
         }
 
         h->ctx.print(&h->ctx, "[%-2d] ", i);
-        h->ctx.module = dwfl_addrmodule(h->ctx.dwfl, h->addr);
+        h->ctx.module = dwfl_addrmodule(h->ctx.dwfl, addr);
         pst_function* last = last_function(h);
         pst_function* fn = add_function(h, NULL);
         fn->sp = sp;
-        pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
-        if(!pst_function_unwind(fn, h->addr)) {
+        pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
+        if(!pst_function_unwind(fn, addr)) {
             del_function(fn);
         } else {
             if(last) {
@@ -260,19 +264,11 @@ bool pst_handler_unwind(pst_handler* h)
 void pst_handler_init(pst_handler* h, ucontext_t* hctx)
 {
     pst_context_init(&h->ctx, hctx);
-    h->handle = NULL;
-    h->addr = 0;
-    h->frame = NULL;
-    h->caller = NULL;
     list_head_init(&h->functions);
 }
 
 void pst_handler_fini(pst_handler* h)
 {
-    if(h->handle) {
-        dlclose(h->handle);
-    }
-
     clear(h);
     pst_context_fini(&h->ctx);
 }

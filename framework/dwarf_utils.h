@@ -12,7 +12,7 @@
 
 #include "dwarf_expression.h"
 #include "context.h"
-#include "sysutils.h"
+#include "dwarf_handler.h"
 
 typedef struct __reginfo {
     __reginfo() {
