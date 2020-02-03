@@ -19,7 +19,7 @@
 // -----------------------------------------------------------------------------------
 // DWARF Stack value
 // -----------------------------------------------------------------------------------
-void value_set(pst_dwarf_value* value, void* v, uint32_t s, int t)
+void pst_dwarf_value_set(pst_dwarf_value* value, void* v, uint32_t s, int t)
 {
     pst_assert(value && v && s > 0 && s <= sizeof(value->value));
 
@@ -70,8 +70,7 @@ void pst_dwarf_value_init(pst_dwarf_value* dv, char* v, uint32_t s, int t)
     list_node_init(&dv->node);
     dv->type = t;
     dv->allocated = false;
-    dv->set = value_set;
-    value_set(dv, v, s, t);
+    pst_dwarf_value_set(dv, v, s, t);
 }
 
 pst_dwarf_value* pst_dwarf_value_new(char* v, uint32_t s, int t)
@@ -104,16 +103,19 @@ void pst_dwarf_value_fini(pst_dwarf_value* value)
 // -----------------------------------------------------------------------------------
 // DWARF stack
 // -----------------------------------------------------------------------------------
-void stack_push(pst_dwarf_stack* st, void* v, uint32_t s, int t) {
+void pst_dwarf_stack_push(pst_dwarf_stack* st, void* v, uint32_t s, int t)
+{
     pst_new(pst_dwarf_value, value, (char*)v, s, t);
     list_add_head(&st->values, &value->node);
 }
 
-void stack_push_value(pst_dwarf_stack* st, pst_dwarf_value* value) {
+void pst_dwarf_stack_push_value(pst_dwarf_stack* st, pst_dwarf_value* value)
+{
     list_add_head(&st->values, &value->node);
 }
 
-pst_dwarf_value* stack_pop(pst_dwarf_stack* st) {
+pst_dwarf_value* pst_dwarf_stack_pop(pst_dwarf_stack* st)
+{
     pst_dwarf_value* value = (pst_dwarf_value*)list_first(&st->values);
     if(value) {
         list_del(&value->node);
@@ -122,7 +124,8 @@ pst_dwarf_value* stack_pop(pst_dwarf_stack* st) {
     return value;
 }
 
-pst_dwarf_value* stack_get(pst_dwarf_stack* st, uint32_t idx = 0) {
+pst_dwarf_value* pst_dwarf_stack_get(pst_dwarf_stack* st, uint32_t idx)
+{
     pst_dwarf_value* value = NULL;
     struct list_node  *pos;
     list_for_each_entry(value, pos, &st->values, node) {
@@ -135,7 +138,7 @@ pst_dwarf_value* stack_get(pst_dwarf_stack* st, uint32_t idx = 0) {
     return value;
 }
 
-bool stack_get_value(pst_dwarf_stack* st, uint64_t* value)
+bool pst_dwarf_stack_get_value(pst_dwarf_stack* st, uint64_t* value)
 {
     assert(st && value);
 
@@ -143,7 +146,7 @@ bool stack_get_value(pst_dwarf_stack* st, uint64_t* value)
         return false;
     }
 
-    pst_dwarf_value* v = st->get(st, 0);
+    pst_dwarf_value* v = pst_dwarf_stack_get(st, 0);
     if(v->type & DWARF_TYPE_REGISTER_LOC) {
         // dereference register location
         int ret = unw_get_reg(st->ctx->curr_frame, v->value.uint64, value);
@@ -161,7 +164,7 @@ bool stack_get_value(pst_dwarf_stack* st, uint64_t* value)
     return true;
 }
 
-void stack_clear(pst_dwarf_stack* st)
+void pst_dwarf_stack_clear(pst_dwarf_stack* st)
 {
     pst_dwarf_value*  value = NULL;
     struct list_node  *pos, *tn;
@@ -177,9 +180,9 @@ void stack_clear(pst_dwarf_stack* st)
     }
 }
 
-bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun = NULL)
+bool pst_dwarf_stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun)
 {
-    st->clear(st);
+    pst_dwarf_stack_clear(st);
 
     for (int i = 0; i < expr_len; i++) {
         const dwarf_op_map* map = find_op_map(exprs[i].atom);
@@ -191,7 +194,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
         pst_new(pst_dwarf_op, op, exprs[i].atom, exprs[i].number, exprs[i].number2);
         list_add_bottom(&st->expr, &op->node);
 
-        pst_dwarf_value* v = st->get(st, 0);
+        pst_dwarf_value* v = pst_dwarf_stack_get(st, 0);
         // dereference register location there if it is not last in stack
         if(v && (v->type & DWARF_TYPE_REGISTER_LOC)) {
             unw_word_t value = 0;
@@ -201,7 +204,7 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                 pst_log(SEVERITY_ERROR, "Failed to ger value of register 0x%X. Error: %d", regno, ret);
                 return false;
             }
-            v->set(v, &value, sizeof(value), DWARF_TYPE_GENERIC);
+            pst_dwarf_value_set(v, &value, sizeof(value), DWARF_TYPE_GENERIC);
         }
 
         // handle there because it contains sub-expression of a Location in caller's frame
@@ -221,22 +224,22 @@ bool stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attrib
                 Dwarf_Op *expr;
                 size_t exprlen;
                 if (dwarf_getlocation(&attr_mem, &expr, &exprlen) == 0) {
-                    pst_call_site* cs = fun->parent->call_sites.find_call_site(&fun->parent->call_sites, fun);
+                    pst_call_site* cs = pst_call_site_storage_find(&fun->parent->call_sites, fun);
                     if(!cs) {
                         pst_log(SEVERITY_ERROR, "Failed to find call site while calculate DW_OP_GNU_entry_value expression");
                         return false;
                     }
                     pst_dwarf_expr loc;
                     pst_dwarf_expr_init(&loc);
-                    loc.setup(&loc, expr, exprlen);
-                    pst_call_site_param* param = cs->find_param(cs, &loc);
+                    pst_dwarf_expr_setup(&loc, expr, exprlen);
+                    pst_call_site_param* param = pst_call_site_find(cs, &loc);
                     pst_dwarf_expr_fini(&loc);
                     if(!param) {
                         pst_log(SEVERITY_ERROR, "Failed to find call site parameter while calculate DW_OP_GNU_entry_value expression");
                         return false;
                     }
 
-                    st->push(st, &param->value, sizeof(param->value), DWARF_TYPE_GENERIC);
+                    pst_dwarf_stack_push(st, &param->value, sizeof(param->value), DWARF_TYPE_GENERIC);
 
                     continue;
                 } else {
@@ -265,14 +268,6 @@ void pst_dwarf_stack_init(pst_dwarf_stack* st, pst_context* ctx)
 
     list_head_init(&st->expr);
     list_head_init(&st->values);
-    st->push = stack_push;
-    st->push_value = stack_push_value;
-    st->pop = stack_pop;
-    st->get = stack_get;
-    st->get_value = stack_get_value;
-    st->calc = stack_calc;
-    st->clear = stack_clear;
-
     st->ctx = ctx;
     st->allocated = false;
 }
@@ -294,7 +289,7 @@ void pst_dwarf_stack_fini(pst_dwarf_stack* st)
 {
     pst_assert(st);
 
-    st->clear(st);
+    pst_dwarf_stack_clear(st);
     if(st->allocated) {
         pst_free(st);
     } else {

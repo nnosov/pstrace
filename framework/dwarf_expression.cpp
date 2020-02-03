@@ -53,26 +53,7 @@ void pst_dwarf_op_fini(pst_dwarf_op* dwop)
 //
 // pst_dwarf_expr
 //
-bool expr_is_equal(pst_dwarf_expr* lhs, pst_dwarf_expr* rhs)
-{
-    if(list_count(&lhs->operations) != list_count(&rhs->operations)) {
-        return false;
-    }
-
-    pst_dwarf_op* lop = lhs->next_op(lhs, NULL);
-    pst_dwarf_op* rop = rhs->next_op(rhs, NULL);
-    while(lop && rop) {
-        if(lop->operation == rop->operation && lop->arg1 == rop->arg1 && lop->arg2 == rop->arg2) {
-            return true;
-        }
-        lop = lhs->next_op(lhs, lop);
-        rop = rhs->next_op(rhs, rop);
-    }
-
-    return false;
-}
-
-pst_dwarf_op* expr_add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1, uint64_t arg2)
+pst_dwarf_op* add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1, uint64_t arg2)
 {
     pst_new(pst_dwarf_op, op, operation, arg1, arg2);
     list_add_bottom(&expr->operations, &op->node);
@@ -80,7 +61,7 @@ pst_dwarf_op* expr_add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1
     return op;
 }
 
-pst_dwarf_op* expr_next_op(pst_dwarf_expr* expr, pst_dwarf_op* op)
+pst_dwarf_op* next_op(pst_dwarf_expr* expr, pst_dwarf_op* op)
 {
     struct list_node* n = (op == NULL) ? list_first(&expr->operations) : list_next(&op->node);
 
@@ -92,7 +73,17 @@ pst_dwarf_op* expr_next_op(pst_dwarf_expr* expr, pst_dwarf_op* op)
     return ret;
 }
 
-bool expr_print_op(pst_dwarf_expr* expr, const char* fmt, ...)
+void clean(pst_dwarf_expr* expr)
+{
+    pst_dwarf_op* op = NULL;
+    struct list_node  *pos, *tn;
+    list_for_each_entry_safe(op, pos, tn, &expr->operations, node) {
+        list_del(&op->node);
+        pst_dwarf_op_fini(op);
+    }
+}
+
+bool pst_dwarf_expr_print_op(pst_dwarf_expr* expr, const char* fmt, ...)
 {
     bool nret = true;
 
@@ -109,42 +100,41 @@ bool expr_print_op(pst_dwarf_expr* expr, const char* fmt, ...)
     return nret;
 }
 
-void expr_set_value(pst_dwarf_expr* expr, uint64_t v)
+void pst_dwarf_expr_set_value(pst_dwarf_expr* expr, uint64_t v)
 {
     expr->has_value = true;
     expr->value = v;
 }
 
-void expr_clean(pst_dwarf_expr* expr)
+bool pst_dwarf_expr_equal(pst_dwarf_expr* lhs, pst_dwarf_expr* rhs)
 {
-    pst_dwarf_op* op = NULL;
-    struct list_node  *pos, *tn;
-    list_for_each_entry_safe(op, pos, tn, &expr->operations, node) {
-        list_del(&op->node);
-        pst_dwarf_op_fini(op);
+    if(list_count(&lhs->operations) != list_count(&rhs->operations)) {
+        return false;
     }
+
+    pst_dwarf_op* lop = next_op(lhs, NULL);
+    pst_dwarf_op* rop = next_op(rhs, NULL);
+    while(lop && rop) {
+        if(lop->operation == rop->operation && lop->arg1 == rop->arg1 && lop->arg2 == rop->arg2) {
+            return true;
+        }
+        lop = next_op(lhs, lop);
+        rop = next_op(rhs, rop);
+    }
+
+    return false;
 }
 
-void expr_setup(pst_dwarf_expr* expr, Dwarf_Op* exprs, size_t exprlen)
+void pst_dwarf_expr_setup(pst_dwarf_expr* expr, Dwarf_Op* exprs, size_t exprlen)
 {
-    expr->clean(expr);
+    clean(expr);
     for(size_t i = 0; i < exprlen; ++i) {
-        expr->add_op(expr, exprs[i].atom, exprs[i].number, exprs[i].number2);
+        add_op(expr, exprs[i].atom, exprs[i].number, exprs[i].number2);
     }
 }
 
 void pst_dwarf_expr_init(pst_dwarf_expr* expr)
 {
-    // methods
-    expr->is_equal = expr_is_equal;
-    expr->add_op = expr_add_op;
-    expr->next_op = expr_next_op;
-    expr->clean = expr_clean;
-    expr->setup = expr_setup;
-    expr->set_value = expr_set_value;
-    expr->print_op = expr_print_op;
-
-    // fields
     list_head_init(&expr->operations);
     expr->has_value = false;
     expr->value = 0;
@@ -167,7 +157,7 @@ pst_dwarf_expr* pst_dwarf_expr_new()
 
 void pst_dwarf_expr_fini(pst_dwarf_expr* expr)
 {
-    expr->clean(expr);
+    clean(expr);
     if(expr->allocated) {
         pst_free(expr);
     }

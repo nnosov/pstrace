@@ -32,18 +32,6 @@
 #include "dwarf_function.h"
 
 typedef struct pst_handler {
-    // methods
-    void                    (*clear) (pst_handler* h);
-    pst_function*           (*add_function) (pst_handler* h, pst_function* fun);
-    void                    (*del_function) (pst_function* f);
-    pst_function*           (*next_function) (pst_handler* h, pst_function* f);
-    pst_function*           (*prev_function) (pst_handler* h, pst_function* fn);
-
-    bool                    (*handle_dwarf) (pst_handler* h);
-	void                    (*print_dwarf) (pst_handler* h);
-	bool                    (*unwind) (pst_handler* h);
-
-	// fields
 	pst_context					ctx;		// context of unwinding
 	void*						handle;		// process handle
 	Dwarf_Addr 					addr;		// address of currently processed function
@@ -53,5 +41,9 @@ typedef struct pst_handler {
 } pst_handler;
 void pst_handler_init(pst_handler* h, ucontext_t* hctx);
 void pst_handler_fini(pst_handler* h);
+
+bool pst_handler_handle_dwarf(pst_handler* h);
+void pst_handler_print_dwarf(pst_handler* h);
+bool pst_handler_unwind(pst_handler* h);
 
 #endif /* SC_SYSUTILS_H_ */

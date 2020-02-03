@@ -65,13 +65,13 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    ret = handler.unwind(&handler);
+	    ret = pst_handler_unwind(&handler);
     }
 
 	if(ret) {
 	    pst_log(SEVERITY_INFO, "%s", handler.ctx.buff);
-	    handler.handle_dwarf(&handler);
-	    handler.print_dwarf(&handler);
+	    pst_handler_handle_dwarf(&handler);
+	    pst_handler_print_dwarf(&handler);
 	    pst_log(SEVERITY_INFO, "%s", handler.ctx.buff);
 	} else {
 	    pst_log(SEVERITY_ERROR, "No stack trace obtained");

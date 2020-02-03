@@ -34,7 +34,7 @@
 // dwarf_getattrs() allows to enumerate all DIE attributes
 // dwarf_getfuncs() allows to enumerate functions within CU
 
-bool handler_get_dwarf_function(pst_handler* h, pst_function* fun)
+bool get_dwarf_function(pst_handler* h, pst_function* fun)
 {
     Dwarf_Addr mod_cu = 0;
     // get CU(Compilation Unit) debug definition
@@ -64,7 +64,7 @@ bool handler_get_dwarf_function(pst_handler* h, pst_function* fun)
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
 		    //ctx.log(SEVERITY_DEBUG, "function die name %s", dwarf_diename(&result));
 			if(!strcmp(fun->name, dwarf_diename(&result))) {
-				return fun->handle_dwarf(fun, &result);
+				return pst_function_handle_dwarf(fun, &result);
 			}
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
@@ -72,7 +72,7 @@ bool handler_get_dwarf_function(pst_handler* h, pst_function* fun)
 	return nret;
 }
 
-pst_function* handler_add_function(pst_handler* h, pst_function* parent)
+pst_function* add_function(pst_handler* h, pst_function* parent)
 {
     pst_new(pst_function, fn, &h->ctx, parent);
     list_add_bottom(&h->functions, &fn->node);
@@ -80,13 +80,13 @@ pst_function* handler_add_function(pst_handler* h, pst_function* parent)
     return fn;
 }
 
-void handler_del_function(pst_function* fn)
+void del_function(pst_function* fn)
 {
     list_del(&fn->node);
     pst_function_fini(fn);
 }
 
-void handler_clear(pst_handler* h)
+void clear(pst_handler* h)
 {
     pst_function*  fn = NULL;
     struct list_node  *pos, *tn;
@@ -96,7 +96,7 @@ void handler_clear(pst_handler* h)
     }
 }
 
-pst_function* handler_next_function(pst_handler* h, pst_function* fn)
+pst_function* next_function(pst_handler* h, pst_function* fn)
 {
     list_node* n = (fn == NULL) ? list_first(&h->functions) : list_next(&fn->node);
     pst_function* ret = NULL;
@@ -107,7 +107,7 @@ pst_function* handler_next_function(pst_handler* h, pst_function* fn)
     return ret;
 }
 
-pst_function* handler_prev_function(pst_handler* h, pst_function* fn)
+pst_function* prev_function(pst_handler* h, pst_function* fn)
 {
     list_node* n = (fn == NULL) ? list_last(&h->functions) : list_prev(&fn->node);
     pst_function* ret = NULL;
@@ -118,7 +118,7 @@ pst_function* handler_prev_function(pst_handler* h, pst_function* fn)
     return ret;
 }
 
-pst_function* handler_last_function(pst_handler* h)
+pst_function* last_function(pst_handler* h)
 {
     list_node* n = list_last(&h->functions);
     if(n) {
@@ -128,13 +128,13 @@ pst_function* handler_last_function(pst_handler* h)
     return NULL;
 }
 
-bool handler_handle_dwarf(pst_handler* h)
+bool pst_handler_handle_dwarf(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
     Dl_info info;
 
     //for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
-    for(pst_function* fun = handler_last_function(h); fun; fun = h->prev_function(h, fun)) {
+    for(pst_function* fun = last_function(h); fun; fun = prev_function(h, fun)) {
         dladdr((void*)(fun->pc), &info);
         pst_log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
 
@@ -146,20 +146,20 @@ bool handler_handle_dwarf(pst_handler* h)
         h->ctx.cfa          = fun->cfa;
         h->ctx.curr_frame   = &fun->cursor;
 
-        handler_get_dwarf_function(h, fun);
+        get_dwarf_function(h, fun);
     }
 
     return true;
 }
 
-void handler_print_dwarf(pst_handler* h)
+void pst_handler_print_dwarf(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
     h->ctx.print(&h->ctx, "DWARF-based stack trace information:\n");
     uint32_t idx = 0;
-    for(pst_function* fn = h->next_function(h, NULL); fn; fn = h->next_function(h, fn)) {
+    for(pst_function* fn = next_function(h, NULL); fn; fn = next_function(h, fn)) {
         h->ctx.print(&h->ctx, "[%-2u] ", idx); idx++;
-        fn->print_dwarf(fn);
+        pst_function_print_dwarf(fn);
         h->ctx.print(&h->ctx, "\n");
     }
 }
@@ -174,7 +174,7 @@ Dwfl_Callbacks callbacks = {
 
 #include <dlfcn.h>
 
-bool handler_unwind(pst_handler* h)
+bool pst_handler_unwind(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
 #ifdef REG_RIP // x86_64
@@ -239,12 +239,12 @@ bool handler_unwind(pst_handler* h)
 
         h->ctx.print(&h->ctx, "[%-2d] ", i);
         h->ctx.module = dwfl_addrmodule(h->ctx.dwfl, h->addr);
-        pst_function* last = handler_last_function(h);
-        pst_function* fn = h->add_function(h, NULL);
+        pst_function* last = last_function(h);
+        pst_function* fn = add_function(h, NULL);
         fn->sp = sp;
         pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, h->addr, sp);
-        if(!fn->unwind(fn, h->addr)) {
-            h->del_function(fn);
+        if(!pst_function_unwind(fn, h->addr)) {
+            del_function(fn);
         } else {
             if(last) {
                 last->parent = fn;
@@ -259,17 +259,6 @@ bool handler_unwind(pst_handler* h)
 
 void pst_handler_init(pst_handler* h, ucontext_t* hctx)
 {
-    // methods
-    h->clear = handler_clear;
-    h->add_function = handler_add_function;
-    h->del_function = handler_del_function;
-    h->next_function = handler_next_function;
-    h->prev_function = handler_prev_function;
-    h->handle_dwarf = handler_handle_dwarf;
-    h->print_dwarf = handler_print_dwarf;
-    h->unwind = handler_unwind;
-
-    // fields
     pst_context_init(&h->ctx, hctx);
     h->handle = NULL;
     h->addr = 0;
@@ -284,7 +273,7 @@ void pst_handler_fini(pst_handler* h)
         dlclose(h->handle);
     }
 
-    h->clear(h);
+    clear(h);
     pst_context_fini(&h->ctx);
 }
 

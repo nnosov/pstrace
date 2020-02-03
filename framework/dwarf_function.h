@@ -18,18 +18,7 @@
 // pst_function
 // -----------------------------------------------------------------------------------
 typedef struct __pst_function {
-    list_node           node;       // uplink. !!! must be first !!!
-
-    void                    (*clear) (pst_function* fn);
-    pst_parameter*          (*add_param) (pst_function* fn);
-    void                    (*del_param) (pst_parameter* p);
-    pst_parameter*          (*next_param) (pst_function* fn, pst_parameter* p);
-
-    bool                    (*unwind) (pst_function* fn, Dwarf_Addr addr);
-    bool                    (*handle_dwarf) (pst_function* fn, Dwarf_Die* d);
-    bool                    (*print_dwarf) (pst_function* fn);
-    bool                    (*handle_lexical_block) (pst_function* fn, Dwarf_Die* result);
-    bool                    (*get_frame) (pst_function* fn);
+    list_node               node;
 
     Dwarf_Addr              lowpc;      // offset to start of the function against base address
     Dwarf_Addr              highpc;     // offset to the next address after the end of the function against base address
@@ -52,5 +41,9 @@ typedef struct __pst_function {
 void pst_function_init(pst_function* fn, pst_context* _ctx, __pst_function* _parent);
 void pst_function_fini(pst_function* fn);
 pst_function* pst_function_new(pst_context* _ctx, __pst_function* _parent);
+
+bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr);
+bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d);
+bool pst_function_print_dwarf(pst_function* fn);
 
 #endif /* FRAMEWORK_DWARF_FUNCTION_H_ */

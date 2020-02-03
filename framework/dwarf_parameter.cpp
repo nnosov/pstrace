@@ -45,17 +45,38 @@ void pst_type_fini(pst_type* t)
 //
 // pst_parameter
 //
-bool param_print_dwarf(pst_parameter* param)
+void clear(pst_parameter* param)
+{
+    pst_type* t = NULL;
+    struct list_node  *pos, *tn;
+    list_for_each_entry_safe(t, pos, tn, &param->types, node) {
+        list_del(&t->node);
+        pst_type_fini(t);
+    }
+}
+
+pst_type* next_type(pst_parameter* param, pst_type* t)
+{
+    list_node* n = (t == NULL) ? list_first(&param->types) : list_next(&t->node);
+    pst_type* ret = NULL;
+    if(n) {
+        ret = list_entry(n, pst_type, node);
+    }
+
+    return ret;
+}
+
+bool pst_parameter_print_dwarf(pst_parameter* param)
 {
     if(list_count(&param->types)) {
         if(!param->is_return) {
             if(param->has_value) {
-                param->ctx->print(param->ctx, "%s %s = 0x%lX", param->next_type(param, NULL)->name, param->name, param->location.value);
+                param->ctx->print(param->ctx, "%s %s = 0x%lX", next_type(param, NULL)->name, param->name, param->location.value);
             } else {
-                param->ctx->print(param->ctx, "%s %s = <undefined>", param->next_type(param, NULL)->name, param->name);
+                param->ctx->print(param->ctx, "%s %s = <undefined>", next_type(param, NULL)->name, param->name);
             }
         } else {
-            param->ctx->print(param->ctx, "%s", param->next_type(param, NULL)->name);
+            param->ctx->print(param->ctx, "%s", next_type(param, NULL)->name);
         }
     } else {
         if(param->has_value) {
@@ -67,7 +88,15 @@ bool param_print_dwarf(pst_parameter* param)
     return true;
 }
 
-bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
+pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, int type)
+{
+    pst_new(pst_type, t, name, type);
+    list_add_bottom(&param->types, &t->node);
+
+    return t;
+}
+
+bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base)
 {
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
@@ -89,7 +118,7 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
                 dwarf_formudata(attr, &param->size);
             }
             pst_log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), param->size);
-            param->add_type(param, dwarf_diename(&ret_die), DW_TAG_base_type);
+            pst_parameter_add_type(param, dwarf_diename(&ret_die), DW_TAG_base_type);
             param->type = DW_TAG_base_type;
 
             attr = dwarf_attr(&ret_die, DW_AT_encoding, &attr_mem);
@@ -101,38 +130,38 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
         }
         case DW_TAG_array_type:
             pst_log(SEVERITY_DEBUG, "array type");
-            param->add_type(param, "[]", DW_TAG_array_type);
+            pst_parameter_add_type(param, "[]", DW_TAG_array_type);
             break;
         case DW_TAG_structure_type:
             pst_log(SEVERITY_DEBUG, "structure type");
-            param->add_type(param, "struct", DW_TAG_structure_type);
+            pst_parameter_add_type(param, "struct", DW_TAG_structure_type);
             break;
         case DW_TAG_union_type:
             pst_log(SEVERITY_DEBUG, "union type");
-            param->add_type(param, "union", DW_TAG_union_type);
+            pst_parameter_add_type(param, "union", DW_TAG_union_type);
             break;
         case DW_TAG_class_type:
             pst_log(SEVERITY_DEBUG, "class type");
-            param->add_type(param, "class", DW_TAG_class_type);
+            pst_parameter_add_type(param, "class", DW_TAG_class_type);
             break;
         case DW_TAG_pointer_type:
             pst_log(SEVERITY_DEBUG, "pointer type");
-            param->add_type(param, "*", DW_TAG_pointer_type);
+            pst_parameter_add_type(param, "*", DW_TAG_pointer_type);
             break;
         case DW_TAG_enumeration_type:
             pst_log(SEVERITY_DEBUG, "enumeration type");
-            param->add_type(param, "enum", DW_TAG_enumeration_type);
+            pst_parameter_add_type(param, "enum", DW_TAG_enumeration_type);
             break;
         case DW_TAG_const_type:
             pst_log(SEVERITY_DEBUG, "constant type");
-            param->add_type(param, "const", DW_TAG_const_type);
+            pst_parameter_add_type(param, "const", DW_TAG_const_type);
             break;
         case DW_TAG_subroutine_type:
             pst_log(SEVERITY_DEBUG, "Skipping subroutine type");
             break;
         case DW_TAG_typedef:
             pst_log(SEVERITY_DEBUG, "typedef '%s' type", dwarf_diename(&ret_die));
-            param->add_type(param, dwarf_diename(&ret_die), DW_TAG_typedef);
+            pst_parameter_add_type(param, dwarf_diename(&ret_die), DW_TAG_typedef);
             break;
         default:
             pst_log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
@@ -141,42 +170,13 @@ bool param_handle_type(pst_parameter* param, Dwarf_Attribute* base)
 
     attr = dwarf_attr(&ret_die, DW_AT_type, &attr_mem);
     if(attr) {
-        return param->handle_type(param, attr);
+        return pst_parameter_handle_type(param, attr);
     }
 
     return true;
 }
 
-pst_type* param_add_type(pst_parameter* param, const char* name, int type)
-{
-    pst_new(pst_type, t, name, type);
-    list_add_bottom(&param->types, &t->node);
-
-    return t;
-}
-
-void param_clear(pst_parameter* param)
-{
-    pst_type* t = NULL;
-    struct list_node  *pos, *tn;
-    list_for_each_entry_safe(t, pos, tn, &param->types, node) {
-        list_del(&t->node);
-        pst_type_fini(t);
-    }
-}
-
-pst_type* param_next_type(pst_parameter* param, pst_type* t)
-{
-    list_node* n = (t == NULL) ? list_first(&param->types) : list_next(&t->node);
-    pst_type* ret = NULL;
-    if(n) {
-        ret = list_entry(n, pst_type, node);
-    }
-
-    return ret;
-}
-
-bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun)
+bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun)
 {
     param->die = result;
 
@@ -191,7 +191,7 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
     attr = dwarf_attr(result, DW_AT_type, &attr_mem);
     pst_log(SEVERITY_DEBUG, "---> Handle '%s' %s", param->name, dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
     if(attr) {
-        param->handle_type(param, attr);
+        pst_parameter_handle_type(param, attr);
     }
 
     if(dwarf_hasattr(result, DW_AT_location)) {
@@ -257,15 +257,6 @@ bool param_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* f
 
 void pst_parameter_init(pst_parameter* param, pst_context* ctx)
 {
-    // methods
-    param->clear = param_clear;
-    param->add_type = param_add_type;
-    param->next_type = param_next_type;
-    param->handle_dwarf = param_handle_dwarf;
-    param->handle_type = param_handle_type;
-    param->print_dwarf = param_print_dwarf;
-
-    // fields
     list_node_init(&param->node);
     param->die = NULL;
     param->name = NULL;
@@ -294,7 +285,7 @@ pst_parameter* pst_parameter_new(pst_context* ctx)
 }
 void pst_parameter_fini(pst_parameter* param)
 {
-    param->clear(param);
+    clear(param);
     if(param->name) {
         pst_free(param->name);
     }

@@ -22,7 +22,7 @@ bool dw_op_notimpl(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word o
 // address and whose size is the size of an address on the target machine.
 bool dw_op_addr(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    stack->push(stack, &op1, sizeof(op1), DWARF_TYPE_GENERIC);
+    pst_dwarf_stack_push(stack, &op1, sizeof(op1), DWARF_TYPE_GENERIC);
 	return true;
 }
 
@@ -34,7 +34,7 @@ bool dw_op_addr(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 
 bool dw_op_deref_size(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    pst_dwarf_value* value = stack->pop(stack);
+    pst_dwarf_value* value = pst_dwarf_stack_pop(stack);
     if(value) {
         uint64_t addr = value->value.uint64;
         uint64_t res = 0;
@@ -55,7 +55,7 @@ bool dw_op_deref_size(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Wor
                 return false;
                 break;
         }
-        stack->push(stack, &res, sizeof(res), DWARF_TYPE_GENERIC);
+        pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_GENERIC);
         return true;
     }
 
@@ -97,7 +97,7 @@ bool dw_op_const_x_u(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word
 			return false;
 	}
 
-	stack->push(stack, &op1, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
+	pst_dwarf_stack_push(stack, &op1, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -133,7 +133,7 @@ bool dw_op_const_x_s(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word
 			return false;
 	}
 
-	stack->push(stack, &v, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
+	pst_dwarf_stack_push(stack, &v, size, type | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -142,7 +142,7 @@ bool dw_op_const_x_s(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word
 bool dw_op_constu(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
 	uint64_t value = decode_uleb128((unsigned char*)&op1);
-	stack->push(stack, &value, sizeof(value), DWARF_TYPE_LONG | DWARF_TYPE_UNSIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
+	pst_dwarf_stack_push(stack, &value, sizeof(value), DWARF_TYPE_LONG | DWARF_TYPE_UNSIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 	return true;
 }
 
@@ -150,15 +150,15 @@ bool dw_op_consts(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op
 {
 	// The single operand of the DW_OP_consts operation provides a signed LEB128 integer constant.
 	int64_t value = decode_sleb128((unsigned char*)&op1);
-	stack->push(stack, &value, sizeof(value),  DWARF_TYPE_LONG | DWARF_TYPE_SIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
+	pst_dwarf_stack_push(stack, &value, sizeof(value),  DWARF_TYPE_LONG | DWARF_TYPE_SIGNED | DWARF_TYPE_CONST | DWARF_TYPE_GENERIC);
 	return true;
 }
 
 // The DW_OP_dup operation duplicates the value (including its type identifier) at the top of the stack.
 bool dw_op_dup(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, 0);
-	stack->push(stack, &value->value, sizeof(value->value), value->type);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, 0);
+	pst_dwarf_stack_push(stack, &value->value, sizeof(value->value), value->type);
 
 	return true;
 }
@@ -166,7 +166,7 @@ bool dw_op_dup(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_drop operation pops the value (including its type identifier) at the top of the stack.
 bool dw_op_drop(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->pop(stack);
+	pst_dwarf_value* value = pst_dwarf_stack_pop(stack);
 	pst_dwarf_value_fini(value);
 
 	return true;
@@ -176,8 +176,8 @@ bool dw_op_drop(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 // This is equivalent to a DW_OP_pick operation, with index 1.
 bool dw_op_over(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, 1);
-	stack->push(stack, &value->value, sizeof(value->value), value->type);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, 1);
+	pst_dwarf_stack_push(stack, &value->value, sizeof(value->value), value->type);
 
 	return true;
 }
@@ -186,9 +186,9 @@ bool dw_op_over(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 // A copy of the stack entry (including its type identifier) with the specified index (0 through 255, inclusive) is pushed onto the stack.
 bool dw_op_pick(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, op1);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, op1);
 	if(value) {
-	    stack->push(stack, &value->value, sizeof(value->value), value->type);
+	    pst_dwarf_stack_push(stack, &value->value, sizeof(value->value), value->type);
 		return true;
 	}
 
@@ -199,11 +199,11 @@ bool dw_op_pick(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 // entry, and the second entry (including its type identifier) becomes the top of the stack.
 bool dw_op_swap(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->pop(stack);
-	pst_dwarf_value* value2 = stack->pop(stack);
+	pst_dwarf_value* value1 = pst_dwarf_stack_pop(stack);
+	pst_dwarf_value* value2 = pst_dwarf_stack_pop(stack);
 	if(value1 && value2) {
-	    stack->push_value(stack, value1);
-	    stack->push_value(stack, value2);
+	    pst_dwarf_stack_push_value(stack, value1);
+	    pst_dwarf_stack_push_value(stack, value2);
 		return true;
 	}
 
@@ -223,13 +223,13 @@ bool dw_op_swap(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 // and the third entry (including its type identifier) becomes the second entry
 bool dw_op_rot(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->pop(stack);
-	pst_dwarf_value* value2 = stack->pop(stack);
-	pst_dwarf_value* value3 = stack->pop(stack);
+	pst_dwarf_value* value1 = pst_dwarf_stack_pop(stack);
+	pst_dwarf_value* value2 = pst_dwarf_stack_pop(stack);
+	pst_dwarf_value* value3 = pst_dwarf_stack_pop(stack);
 	if(value1 && value2 && value3) {
-	    stack->push_value(stack, value1);
-	    stack->push_value(stack, value3);
-	    stack->push_value(stack, value2);
+	    pst_dwarf_stack_push_value(stack, value1);
+	    pst_dwarf_stack_push_value(stack, value3);
+	    pst_dwarf_stack_push_value(stack, value2);
 		return true;
 	}
 
@@ -250,10 +250,10 @@ bool dw_op_rot(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // If the absolute value cannot be represented, the result is undefined.
 bool dw_op_abs(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, 0);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, 0);
 	if(value) {
 		uint64_t res = llabs(value->value.int64);
-		value->set(value, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC | DWARF_TYPE_LONG);
+		pst_dwarf_value_set(value, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC | DWARF_TYPE_LONG);
 	}
 
 	return false;
@@ -262,16 +262,16 @@ bool dw_op_abs(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_and operation pops the top two stack values, performs a bitwise and operation on the two, and pushes the result.
 bool dw_op_and(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->get(stack, 0);
-	pst_dwarf_value* value2 = stack->get(stack, 1);
+	pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+	pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			return false;
 		}
 
 		uint64_t res = value1->value.uint64 & value2->value.uint64;
-		stack->pop(stack); stack->pop(stack);
-		stack->push(stack, &res, sizeof(res), DWARF_TYPE_GENERIC);
+		pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+		pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_GENERIC);
 
 		pst_dwarf_value_fini(value1);
 		pst_dwarf_value_fini(value2);
@@ -284,8 +284,8 @@ bool dw_op_and(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_div operation pops the top two stack values, divides the former second entry by the former top of the stack using signed division, and pushes the result.
 bool dw_op_div(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->get(stack, 0);
-	pst_dwarf_value* value2 = stack->get(stack, 1);
+	pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+	pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			return false;
@@ -297,16 +297,16 @@ bool dw_op_div(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 		            return false;
 		        }
 		        uint64_t res = value2->value.int64 / value1->value.int64;
-		        stack->pop(stack); stack->pop(stack);
-		        stack->push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+		        pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+		        pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
 		        return true;
 		    } else {
                 if(value1->value.uint64 == 0) {
                     return false;
                 }
                 int64_t res = value2->value.int64 / value1->value.uint64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
                 return true;
 		    }
 		} else {
@@ -315,16 +315,16 @@ bool dw_op_div(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
                     return false;
                 }
                 int64_t res = value2->value.uint64 / value1->value.int64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
                 return true;
             } else {
                 if(value1->value.uint64 == 0) {
                     return false;
                 }
                 uint64_t res = value2->value.uint64 / value1->value.uint64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
                 return true;
             }
 		}
@@ -336,8 +336,8 @@ bool dw_op_div(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_minus operation pops the top two stack values, subtracts the former top of the stack from the former second entry, and pushes the result.
 bool dw_op_minus(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->get(stack, 0);
-	pst_dwarf_value* value2 = stack->get(stack, 1);
+	pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+	pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			return false;
@@ -349,8 +349,8 @@ bool dw_op_minus(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
 		}
         // use arithmetic by modulo 1 plus
 		uint64_t res = value2->value.uint64 - value1->value.uint64;
-		stack->pop(stack); stack->pop(stack);
-		stack->push(stack, &res, sizeof(res), res_type);
+		pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+		pst_dwarf_stack_push(stack, &res, sizeof(res), res_type);
 
 		return true;
 	}
@@ -361,8 +361,8 @@ bool dw_op_minus(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
 // The DW_OP_mod operation pops the top two stack values and pushes the result of the calculation: former second stack entry modulo the former top of the stack.
 bool dw_op_mod(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->get(stack, 0);
-	pst_dwarf_value* value2 = stack->get(stack, 1);
+	pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+	pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			return false;
@@ -373,8 +373,8 @@ bool dw_op_mod(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 		}
 
 		uint64_t res = value2->value.uint64 % value1->value.uint64;
-		stack->pop(stack); stack->pop(stack);
-		stack->push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+		pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+		pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
 
 		return true;
 	}
@@ -385,8 +385,8 @@ bool dw_op_mod(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_mul operation pops the top two stack entries, multiplies them together, and pushes the result.
 bool dw_op_mul(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    pst_dwarf_value* value1 = stack->get(stack, 0);
-    pst_dwarf_value* value2 = stack->get(stack, 1);
+    pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+    pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
     if(value1 && value2) {
         if(!(value1->type & value2->type)) {
             pst_log(SEVERITY_ERROR, "Different types of two stack values for operation: %s(%0x%X, %0x%X)", map->op_name, value1->type, value2->type);
@@ -396,28 +396,28 @@ bool dw_op_mul(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
         if(value2->type & DWARF_TYPE_SIGNED) {
             if(value1->type & DWARF_TYPE_SIGNED) {
                 uint64_t res = value2->value.int64 * value1->value.int64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
 
                 return true;
             } else {
                 int64_t res = value2->value.int64 * value1->value.uint64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
 
                 return true;
             }
         } else {
             if(value1->type & DWARF_TYPE_SIGNED) {
                 int64_t res = value2->value.uint64 * value1->value.int64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_SIGNED | DWARF_TYPE_GENERIC);
 
                 return true;
             } else {
                 uint64_t res = value2->value.uint64 * value1->value.uint64;
-                stack->pop(stack); stack->pop(stack);
-                stack->push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
+                pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+                pst_dwarf_stack_push(stack, &res, sizeof(res), DWARF_TYPE_UNSIGNED | DWARF_TYPE_GENERIC);
 
                 return true;
             }
@@ -431,7 +431,7 @@ bool dw_op_mul(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // If the negation cannot be represented, the result is undefined.
 bool dw_op_neg(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, 0);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, 0);
 	if(value) {
 	    if(value->type & DWARF_TYPE_CHAR) {
 	        value->value.int8 *= -1;
@@ -451,7 +451,7 @@ bool dw_op_neg(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_not operation pops the top stack entry, and pushes its bitwise complement.
 bool dw_op_not(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, 0);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, 0);
 	if(value) {
 		value->value.uint64 = ~value->value.uint64;
 
@@ -464,16 +464,16 @@ bool dw_op_not(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, 
 // The DW_OP_or operation pops the top two stack entries, performs a bitwise or operation on the two, and pushes the result.
 bool dw_op_or(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-    pst_dwarf_value* value1 = stack->get(stack, 0);
-    pst_dwarf_value* value2 = stack->get(stack, 1);
+    pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+    pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			return false;
 		}
 
 		uint64_t res = value2->value.uint64 | value1->value.uint64;
-        stack->pop(stack); stack->pop(stack);
-		stack->push(stack, &res, sizeof(res), value1->type);
+        pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
+		pst_dwarf_stack_push(stack, &res, sizeof(res), value1->type);
 
 		pst_dwarf_value_fini(value1);
 		pst_dwarf_value_fini(value2);
@@ -487,8 +487,8 @@ bool dw_op_or(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, D
 // The DW_OP_plus operation pops the top two stack entries, adds them together, and pushes the result
 bool dw_op_plus(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value1 = stack->get(stack, 0);
-	pst_dwarf_value* value2 = stack->get(stack, 1);
+	pst_dwarf_value* value1 = pst_dwarf_stack_get(stack, 0);
+	pst_dwarf_value* value2 = pst_dwarf_stack_get(stack, 1);
 	if(value1 && value2) {
 		if(!(value1->type & value2->type)) {
 			return false;
@@ -496,15 +496,15 @@ bool dw_op_plus(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 
 		if((value1->type & DWARF_TYPE_SIGNED) && (value2->type & DWARF_TYPE_SIGNED)) {
 		        int64_t res = value2->value.int64 + value1->value.int64;
-		        stack->push(stack, &res, sizeof(res), value1->type);
+		        pst_dwarf_stack_push(stack, &res, sizeof(res), value1->type);
 		} else {
 		    // if in arithmetic expression even one operand is unsigned then result is unsigned as well
 		    int type = (value1->type & (~DWARF_TYPE_SIGNED)) | DWARF_TYPE_UNSIGNED;
 		    uint64_t res = value2->value.uint64 + value1->value.uint64;
-		    stack->push(stack, &res, sizeof(res), type);
+		    pst_dwarf_stack_push(stack, &res, sizeof(res), type);
 		}
 
-        stack->pop(stack); stack->pop(stack);
+        pst_dwarf_stack_pop(stack); pst_dwarf_stack_pop(stack);
         pst_dwarf_value_fini(value1);
         pst_dwarf_value_fini(value2);
 
@@ -520,7 +520,7 @@ bool dw_op_plus(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1,
 // bytes than can be done with “DW_OP_lit<n> DW_OP_plus.”
 bool dw_op_plus_uconst(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
-	pst_dwarf_value* value = stack->get(stack, 0);
+	pst_dwarf_value* value = pst_dwarf_stack_get(stack, 0);
 	if(value) {
 	    uint64_t op = decode_uleb128((unsigned char*)&op1);
 	    value->value.uint64 += op;
@@ -547,7 +547,7 @@ bool dw_op_reg_x(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
 		regno = map->op_num - DW_OP_reg0;
 	}
 
-	stack->push(stack, &regno, sizeof(regno), DWARF_TYPE_REGISTER_LOC);
+	pst_dwarf_stack_push(stack, &regno, sizeof(regno), DWARF_TYPE_REGISTER_LOC);
 
 	return true;
 }
@@ -577,7 +577,7 @@ bool dw_op_breg_x(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op
 	}
 
 	val += off;
-	stack->push(stack, &val, sizeof(val), DWARF_TYPE_GENERIC);
+	pst_dwarf_stack_push(stack, &val, sizeof(val), DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -591,7 +591,7 @@ bool dw_op_lit_x(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
 	}
 
 	uint64_t val = map->op_num - DW_OP_lit0;
-	stack->push(stack, &val, sizeof(val), DWARF_TYPE_GENERIC);
+	pst_dwarf_stack_push(stack, &val, sizeof(val), DWARF_TYPE_GENERIC);
 
 	return true;
 }
@@ -602,7 +602,7 @@ bool dw_op_lit_x(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
 bool dw_op_stack_value(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
 
-    pst_dwarf_value* v = stack->get(stack, 0);
+    pst_dwarf_value* v = pst_dwarf_stack_get(stack, 0);
     if(v) {
         v->type  = DWARF_TYPE_GENERIC;
         return true;
@@ -622,7 +622,7 @@ bool dw_op_call_frame_cfa(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf
 //        return false;
 //    }
 
-    stack->push(stack, &stack->ctx->cfa, sizeof(stack->ctx->cfa), /*DWARF_TYPE_MEMORY_LOC | */DWARF_TYPE_GENERIC);
+    pst_dwarf_stack_push(stack, &stack->ctx->cfa, sizeof(stack->ctx->cfa), /*DWARF_TYPE_MEMORY_LOC | */DWARF_TYPE_GENERIC);
 
     return true;
 }
@@ -643,7 +643,7 @@ bool dw_op_fbreg(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1
     int64_t off = decode_sleb128((unsigned char*)&op1);
     sp += off;
 
-    stack->push(stack, &sp, sizeof(sp), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
+    pst_dwarf_stack_push(stack, &sp, sizeof(sp), DWARF_TYPE_MEMORY_LOC | DWARF_TYPE_GENERIC);
 
     return true;
 }

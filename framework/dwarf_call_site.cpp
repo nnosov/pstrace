@@ -17,16 +17,8 @@
 // -----------------------------------------------------------------------------------
 // pst_call_site_param
 // -----------------------------------------------------------------------------------
-void param_set_location(pst_call_site_param* param, Dwarf_Op* expr, size_t exprlen)
-{
-    param->location.setup(&param->location, expr, exprlen);
-}
-
 void pst_call_site_param_init(pst_call_site_param* param)
 {
-    // methods
-    param->set_location = param_set_location;
-
     // fields
     param->param = NULL;
     param->name = NULL;
@@ -61,7 +53,7 @@ void pst_call_site_param_fini(pst_call_site_param* param)
 // -----------------------------------------------------------------------------------
 // pst_call_site
 // -----------------------------------------------------------------------------------
-pst_call_site_param* site_add_param(pst_call_site* site)
+pst_call_site_param* add_param(pst_call_site* site)
 {
     pst_call_site_param* p = pst_call_site_param_new();
     pst_call_site_param_init(p);
@@ -70,13 +62,13 @@ pst_call_site_param* site_add_param(pst_call_site* site)
     return p;
 }
 
-void site_del_param(pst_call_site*, pst_call_site_param* p)
+void del_param(pst_call_site*, pst_call_site_param* p)
 {
     list_del(&p->node);
     pst_call_site_param_fini(p);
 }
 
-pst_call_site_param* site_next_param(pst_call_site* site, pst_call_site_param* p)
+pst_call_site_param* next_param(pst_call_site* site, pst_call_site_param* p)
 {
     list_node* n = (p == NULL) ? list_first(&site->params) : list_next(&p->node);
     pst_call_site_param* ret = NULL;
@@ -87,10 +79,10 @@ pst_call_site_param* site_next_param(pst_call_site* site, pst_call_site_param* p
     return ret;
 }
 
-pst_call_site_param* site_find_param(pst_call_site* site, pst_dwarf_expr* expr)
+pst_call_site_param* pst_call_site_find(pst_call_site* site, pst_dwarf_expr* expr)
 {
-    for(pst_call_site_param* param = site_next_param(site, NULL); param; param = site_next_param(site, param)) {
-        if(param->location.is_equal(&param->location, expr)) {
+    for(pst_call_site_param* param = next_param(site, NULL); param; param = next_param(site, param)) {
+        if(pst_dwarf_expr_equal(&param->location, expr)) {
             return param;
         }
     }
@@ -98,7 +90,7 @@ pst_call_site_param* site_find_param(pst_call_site* site, pst_dwarf_expr* expr)
     return NULL;
 }
 
-bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
+bool handle_dwarf(pst_call_site* site, Dwarf_Die* child)
 {
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
@@ -110,14 +102,14 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                 unw_get_reg(site->ctx->curr_frame, UNW_REG_IP,  &pc);
 
                 // expression represent where callee parameter will be stored
-                pst_call_site_param* param = site->add_param(site);
+                pst_call_site_param* param = add_param(site);
                 if(dwarf_hasattr(child, DW_AT_location)) {
                     // handle location expression here
                     // determine location of parameter in stack/heap or CPU registers
                     attr = dwarf_attr(child, DW_AT_location, &attr_mem);
                     if(!handle_location(site->ctx, attr, &param->location, pc, NULL)) {
                         pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
-                        site->del_param(site, param);
+                        del_param(site, param);
                         return false;
                     }
                 }
@@ -133,7 +125,7 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                         pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
                     } else {
                         pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
-                        site->del_param(site, param);
+                        del_param(site, param);
                         return false;
                     }
                 }
@@ -149,14 +141,6 @@ bool site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
 
 void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const char* orn)
 {
-    // methods
-    site->add_param = site_add_param;
-    site->del_param = site_del_param;
-    site->next_param = site_next_param;
-    site->find_param = site_find_param;
-    site->handle_dwarf = site_handle_dwarf;
-
-    // fields
     list_node_init(&site->node);
 
     site->target = tgt;
@@ -209,7 +193,7 @@ void pst_call_site_fini(pst_call_site* site)
 // DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
 // relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
 // get DIE of return type
-bool storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result, pst_function* info)
+bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result, pst_function* info)
 {
     Dwarf_Die origin;
     Dwarf_Attribute attr_mem;
@@ -246,9 +230,9 @@ bool storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result, pst
 
     Dwarf_Die child;
     if(dwarf_child (result, &child) == 0) {
-        pst_call_site* st = storage->add_call_site(storage, target, oname);
-        if(!st->handle_dwarf(st, &child)) {
-            storage->del_call_site(storage, st);
+        pst_call_site* st = pst_call_site_storage_add(storage, target, oname);
+        if(!handle_dwarf(st, &child)) {
+            pst_call_site_storage_del(storage, st);
             return false;
         }
     }
@@ -278,7 +262,7 @@ pst_call_site* storage_call_site_by_target(pst_call_site_storage* storage, uint6
     return ret;
 }
 
-pst_call_site* storage_add_call_site(pst_call_site_storage* storage, uint64_t target, const char* origin)
+pst_call_site* pst_call_site_storage_add(pst_call_site_storage* storage, uint64_t target, const char* origin)
 {
     pst_new(pst_call_site, st, storage->ctx, target, origin);
     list_add_bottom(&storage->call_sites, &st->node);
@@ -292,7 +276,7 @@ pst_call_site* storage_add_call_site(pst_call_site_storage* storage, uint64_t ta
     return st;
 }
 
-void storage_del_call_site(pst_call_site_storage* storage, pst_call_site* st)
+void pst_call_site_storage_del(pst_call_site_storage* storage, pst_call_site* st)
 {
     hash_node* node = NULL;
     list_del(&st->node);
@@ -309,19 +293,8 @@ void storage_del_call_site(pst_call_site_storage* storage, pst_call_site* st)
 
     pst_free(st);
 }
-pst_call_site* storage_next_call_site(pst_call_site_storage* storage, pst_call_site* st)
-{
-    struct list_node* n = (st == NULL) ? list_first(&storage->call_sites) : list_next(&st->node);
 
-    pst_call_site* ret = NULL;
-    if(n) {
-        ret = list_entry(n, pst_call_site, node);
-    }
-
-    return ret;
-}
-
-pst_call_site* storage_find_call_site(pst_call_site_storage* storage, pst_function* callee)
+pst_call_site* pst_call_site_storage_find(pst_call_site_storage* storage, pst_function* callee)
 {
     uint64_t start_pc = storage->ctx->base_addr + callee->lowpc;
     pst_call_site* cs = storage_call_site_by_target(storage, start_pc);
@@ -334,14 +307,6 @@ pst_call_site* storage_find_call_site(pst_call_site_storage* storage, pst_functi
 
 void pst_call_site_storage_init(pst_call_site_storage* storage, pst_context* ctx)
 {
-    // methods
-    storage->handle_dwarf = storage_handle_dwarf;
-    storage->add_call_site = storage_add_call_site;
-    storage->del_call_site = storage_del_call_site;
-    storage->find_call_site = storage_find_call_site;
-    storage->next_call_site = storage_next_call_site;
-
-    // fields
     storage->ctx = ctx;
     list_head_init(&storage->call_sites);
     hash_head_init(&storage->cs_to_target);

@@ -31,14 +31,6 @@ typedef struct __pst_function pst_function;
 typedef struct pst_parameter{
     list_node       node;           // uplink. !!! must be first !!!
 
-    // methods
-    void            (*clear) (pst_parameter* param);
-    pst_type*       (*add_type) (pst_parameter* param, const char* name, int type);
-    pst_type*       (*next_type) (pst_parameter* param, pst_type* t);
-    bool            (*handle_dwarf) (pst_parameter* param, Dwarf_Die* d, pst_function* fun);
-    bool            (*handle_type) (pst_parameter* param, Dwarf_Attribute* attr);
-    bool            (*print_dwarf) (pst_parameter* param);
-
     // fields
     Dwarf_Die*      die;            // DWARF DIE containing parameter's definition
     char*           name;           // parameter's name
@@ -59,5 +51,9 @@ void pst_parameter_init(pst_parameter* param, pst_context* ctx);
 pst_parameter* pst_parameter_new(pst_context* ctx);
 void pst_parameter_fini(pst_parameter* param);
 
+bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun);
+bool pst_parameter_print_dwarf(pst_parameter* param);
+bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base);
+pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, int type);
 
 #endif /* FRAMEWORK_DWARF_PARAMETER_H_ */

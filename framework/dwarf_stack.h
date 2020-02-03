@@ -57,17 +57,8 @@ typedef union {
     void*       ptr;
 } pst_sized_value;
 
-// forward declaration
-typedef struct __pst_dwarf_value pst_dwarf_value;
-
-// typedefs for member function pointers
-typedef void (*pst_dwarf_value_set) (pst_dwarf_value* value, void* v, uint32_t s, int t);
-
 typedef struct __pst_dwarf_value {
     list_node            node;       // uplink, !!! must be 1st field in structure !!!
-
-    // methods
-    pst_dwarf_value_set set;        // replace value data
 
     // fields
     pst_sized_value     value;      // value itself
@@ -78,35 +69,13 @@ typedef struct __pst_dwarf_value {
 void pst_dwarf_value_init(pst_dwarf_value* value, char* v, uint32_t s, int t);
 pst_dwarf_value* pst_dwarf_value_new(char* v, uint32_t s, int t);
 void pst_dwarf_value_fini(pst_dwarf_value* value);
-
+void pst_dwarf_value_set(pst_dwarf_value* value, void* v, uint32_t s, int t);
 
 // -----------------------------------------------------------------------------------
 // DWARF stack
 // -----------------------------------------------------------------------------------
 
-// forward declaration
-typedef struct __pst_dwarf_stack pst_dwarf_stack;
-
-// typedefs for member function pointers
-typedef void                (*pst_dwarf_stack_push)         (pst_dwarf_stack* st, void* v, uint32_t s, int t);
-typedef void                (*pst_dwarf_stack_push_val)     (pst_dwarf_stack* st, pst_dwarf_value* value);
-typedef pst_dwarf_value*    (*pst_dwarf_stack_pop)          (pst_dwarf_stack* st);
-typedef pst_dwarf_value*    (*pst_dwarf_stack_get)          (pst_dwarf_stack* st, uint32_t idx);
-typedef bool                (*pst_dwarf_stack_calc)         (pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun);
-typedef bool                (*pst_dwarf_stack_get_value)    (pst_dwarf_stack* st, uint64_t* value);
-typedef void                (*pst_dwarf_stack_clear)        (pst_dwarf_stack* st);
-
 typedef struct __pst_dwarf_stack {
-    // methods
-    pst_dwarf_stack_push        push;       // push new value on the top of the stack
-    pst_dwarf_stack_push_val    push_value; // push an existing value on the top of the stack
-    pst_dwarf_stack_pop         pop;        // pop value from the top of the stack
-    pst_dwarf_stack_get         get;        // get value from top of the stack without popping
-    pst_dwarf_stack_calc        calc;       // calculate DWARF expression
-    pst_dwarf_stack_get_value   get_value;  // get result of calculation
-    pst_dwarf_stack_clear       clear;      // clean-up the stack
-
-    // fields
     list_head                   expr;       // DWARF expression
     list_head                   values;     // list of values on the stack
     pst_context*                ctx;        // context of execution
@@ -116,5 +85,13 @@ typedef struct __pst_dwarf_stack {
 void pst_dwarf_stack_init(pst_dwarf_stack* st, pst_context* ctx);
 pst_dwarf_stack* pst_dwarf_stack_new(pst_context* ctx);
 void pst_dwarf_stack_fini(pst_dwarf_stack* st);
+
+bool pst_dwarf_stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun = NULL);
+void pst_dwarf_stack_clear(pst_dwarf_stack* st);
+bool pst_dwarf_stack_get_value(pst_dwarf_stack* st, uint64_t* value);
+pst_dwarf_value* pst_dwarf_stack_get(pst_dwarf_stack* st, uint32_t idx = 0);
+pst_dwarf_value* pst_dwarf_stack_pop(pst_dwarf_stack* st);
+void pst_dwarf_stack_push_value(pst_dwarf_stack* st, pst_dwarf_value* value);
+void pst_dwarf_stack_push(pst_dwarf_stack* st, void* v, uint32_t s, int t);
 
 #endif /* FRAMEWORK_DWARF_STACK_H_ */
