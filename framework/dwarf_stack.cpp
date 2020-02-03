@@ -209,14 +209,11 @@ bool pst_dwarf_stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dw
 
         // handle there because it contains sub-expression of a Location in caller's frame
         if(map->op_num == DW_OP_GNU_entry_value) {
-            if(!fun) {
-                pst_log(SEVERITY_ERROR, "Cannot calculate DW_OP_GNU_entry_value expression while function is undefined");
+            if(!fun || !fun->parent) {
+                pst_log(SEVERITY_ERROR, "Cannot calculate DW_OP_GNU_entry_value expression while function and it's caller is undefined");
                 return false;
             }
-            if(!fun->parent) {
-                pst_log(SEVERITY_ERROR, "Function has not parent while calculate DW_OP_GNU_entry_value expression");
-                return false;
-            }
+
             // This opcode has two operands, the first one is uleb128 length and the second is block of that length, containing either a
             // simple register or DWARF expression
             Dwarf_Attribute attr_mem;
