@@ -90,7 +90,7 @@ pst_call_site_param* pst_call_site_find(pst_call_site* site, pst_dwarf_expr* exp
     return NULL;
 }
 
-bool handle_dwarf(pst_call_site* site, Dwarf_Die* child)
+bool call_site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
 {
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
@@ -112,20 +112,22 @@ bool handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                         del_param(site, param);
                         return false;
                     }
+                    pst_log(SEVERITY_DEBUG, "  DW_AT_location: %s", site->ctx->buff);
                 }
 
                 // expression represents call parameter's value
                 if(dwarf_hasattr(child, DW_AT_GNU_call_site_value)) {
                     // handle value expression here
                     attr = dwarf_attr(child, DW_AT_GNU_call_site_value, &attr_mem);
-                    pst_dwarf_expr loc;
-                    pst_dwarf_expr_init(&loc);
+                    pst_decl0(pst_dwarf_expr, loc);
                     if(handle_location(site->ctx, attr, &loc, pc, NULL)) {
                         param->value = loc.value;
-                        pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
+                        pst_dwarf_expr_fini(&loc);
+                        pst_log(SEVERITY_DEBUG, "  DW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
                     } else {
                         pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
                         del_param(site, param);
+                        pst_dwarf_expr_fini(&loc);
                         return false;
                     }
                 }
@@ -204,7 +206,7 @@ bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Di
     const char* oname = NULL;
     if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
         oname = dwarf_diename(&origin);
-        pst_log(SEVERITY_DEBUG, "\tDW_AT_abstract_origin: '%s'", oname);
+        pst_log(SEVERITY_DEBUG, "DW_AT_abstract_origin: '%s'", oname);
     }
 
     // The call site may have a DW_AT_call_site_target attribute which is a DWARF expression.  For indirect calls or jumps where it is unknown at
@@ -213,13 +215,20 @@ bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Di
     if(dwarf_hasattr (result, DW_AT_GNU_call_site_target)) {
         attr = dwarf_attr(result, DW_AT_GNU_call_site_target, &attr_mem);
         if(attr) {
-            pst_dwarf_expr expr;
-            pst_dwarf_expr_init(&expr);
+            pst_decl0(pst_dwarf_expr, expr);
             if(handle_location(storage->ctx, &attr_mem, &expr, info->pc, info)) {
                 target = expr.value;
-                pst_log(SEVERITY_DEBUG, "\tDW_AT_GNU_call_site_target: %#lX", target);
+                pst_log(SEVERITY_DEBUG, "DW_AT_GNU_call_site_target: %#lX", target);
             }
             pst_dwarf_expr_fini(&expr);
+        }
+    }
+
+    // if attribute is specified, then it's value is actually PC in caller's frame (address of invocation of callee)
+    if(dwarf_hasattr (result, DW_AT_low_pc) && dwarf_attr(result, DW_AT_low_pc, &attr_mem)) {
+        Dwarf_Addr low_pc;
+        if(!dwarf_formaddr(&attr_mem, &low_pc)) {
+            pst_log(SEVERITY_DEBUG, "DW_AT_low_pc: %#lX", low_pc);
         }
     }
 
@@ -231,7 +240,7 @@ bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Di
     Dwarf_Die child;
     if(dwarf_child (result, &child) == 0) {
         pst_call_site* st = pst_call_site_storage_add(storage, target, oname);
-        if(!handle_dwarf(st, &child)) {
+        if(!call_site_handle_dwarf(st, &child)) {
             pst_call_site_storage_del(storage, st);
             return false;
         }
