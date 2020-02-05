@@ -1,15 +1,12 @@
-#ifndef LOG_H_
-#define LOG_H_
+#ifndef PST_LOG_H_
+#define PST_LOG_H_
 
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <string>
-
-#include "mutex.h"
-
-using std::string;
+#include <pthread.h>
+#include <limits.h>
 
 // Log message severity
 enum SC_LogSeverity {
@@ -21,128 +18,33 @@ enum SC_LogSeverity {
     SEVERITY_MAX
 };
 
+#define LOG_BUFF_SIZE       (1024*1024)
 
-class SC_LogBase
-{
-protected:
+typedef struct __pst_log pst_log;
 
-    SC_LogBase(uint32_t id, const char* source);
+typedef struct __pst_log {
+    // methods
+    void (*close) (pst_log* log);
+    bool (*open) (pst_log* log);
+    bool (*is_opened) (pst_log* log);
+    void (*log) (pst_log* log, SC_LogSeverity severity, const char* fmt, ...);
+    void (*send_message) (pst_log* log, SC_LogSeverity severity);
 
-public:
+    // fields
+    char*                       mpSource;               // source for store log messages (file, IP:port or something else)
 
-    virtual ~SC_LogBase();
+    char                        mString[LOG_BUFF_SIZE]; // formatted string to be printed
+    uint32_t                    mStringSize;            // size of the 'mString' buffer
+    uint32_t                    mStringLen;             // length of the formatted string
 
-    //variable argument number logging
-    inline virtual void Log(SC_LogSeverity severity, const char* fmt, ...)
-    {
-        if (severity < mCurrentSeverity)
-            return;
+    SC_LogSeverity            	mCurrentSeverity;       // maximum severity value to be logged
+    pthread_mutex_t             mLock;
 
-        mLock.Lock();
+    void*                       child;
+} pst_log;
 
-        if(!IsOpened())
-        {
-            //print header if present
-            if(Open() && mHeader.size())
-            {
-                SendMessage((char*)mHeader.c_str(), severity);
-            }
-        }
+void pst_log_init_console(pst_log* log);
+void pst_log_init_file(pst_log* log, const char* path, uint64_t max_bytes = 64 * 1024 * 1024/* 64Mb */);
+void pst_log_fini(pst_log* log);
 
-        mStringLen = 0;
-        FormatPrefix(severity);
-        va_list args;
-        va_start(args, fmt);
-        FormatString(fmt, args);
-        va_end(args);
-        FormatPostfix();
-        SendMessage(mString, severity);
-
-        mLock.Unlock();
-    }
-
-    //open source for send messages
-    virtual bool Open() = 0;
-
-    //close source
-    virtual void Close(){}
-
-    //whether source already opened
-    virtual bool IsOpened() = 0;
-
-    //returns source path
-    string& GetSource()
-    {
-        return mSource;
-    }
-
-    //assign source path
-    inline void SetSource(const char* source)
-    {
-        Close();
-        mSource = source;
-    }
-
-    void SetSource(string& source)
-    {
-        SetSource(source.c_str());
-    }
-
-    //assign Log header
-    inline void SetHeader(const char* header)
-    {
-        mHeader = string(header) + '\n';
-    }
-
-    //return Log ID
-    inline uint32_t GetID() const
-    {
-        return mID;
-    }
-
-    //set Log ID
-    inline void SetID(uint32_t id)
-    {
-        mID = id;
-    }
-
-    //return current severity threshold applied to the messages
-    inline SC_LogSeverity GetCurrentSeverity() const
-    {
-        return mCurrentSeverity;
-    }
-
-    //set severity threshold to be applied to the messages
-    inline void SetCurrentSeverity(SC_LogSeverity severity)
-    {
-        mCurrentSeverity = severity;
-    }
-
-protected:
-
-    //actually sends message to the source
-    virtual void SendMessage(const char* msg, SC_LogSeverity severity = SEVERITY_DEBUG) = 0;
-
-    //format message prefix
-    virtual void FormatPrefix(SC_LogSeverity severity);
-
-    //format message body
-    virtual void FormatString(const char* fmt, va_list args);
-
-    //format message postfix
-    virtual void FormatPostfix();
-
-protected:
-
-    uint32_t                    mID;                //log ID, associated with source
-    string                      mSource;            //source for store log messages (file, IP address or sometsing else)
-    string                      mHeader;            //header of the Log
-    static char                 mString[];          //formatted string to be printed
-    static uint32_t             mStringSize;        //size of the string buffer
-    uint32_t                    mStringLen;         //length of the string
-    SC_LogSeverity            	mCurrentSeverity;   //maximum severity value to be logged
-    static const char * const 	mSeverityStrings[];
-    SC_Mutex                 	mLock;
-};
-
-#endif /* LOG_H_ */
+#endif /* PST_LOG_H_ */
