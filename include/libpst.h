@@ -1,12 +1,14 @@
 /*
- * sysutils.h
+ * libpst.h
+ *
+ * External interface to libpst
  *
  *  Created on: Dec 28, 2019
  *      Author: nnosov
  */
 
-#ifndef PST_HANDLER_H_
-#define PST_HANDLER_H_
+#ifndef __LIBPST_EXTERNAL_H_
+#define __LIBPST_EXTERNAL_H_
 
 //system
 #include <ucontext.h>
@@ -45,4 +47,4 @@ int pst_unwind_pretty(pst_handler* h, FILE* fd);
 // save stack trace information to provided buffer in RAM
 int pst_unwind_pretty(pst_handler* h, char* buff, uint32_t buff_size);
 
-#endif /* PST_HANDLER_H_ */
+#endif /* __LIBPST_EXTERNAL_H_ */

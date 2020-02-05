@@ -24,6 +24,7 @@ AR	= ar rvs
 BUILD_DIR	= ./build
 RESULT_DIR	= ../build
 LIB_STATIC	= $(RESULT_DIR)/libpst.a
+LIB_SHARED	=  $(RESULT_DIR)/libpst.so
 
 #Software LABEL, BUILD number, and DATE of build 
 $(shell mkdir -p ${BUILD_DIR})
@@ -41,7 +42,7 @@ FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_M
 
 .PHONY: all clean
 
-all: $(LIB_STATIC)
+all: $(LIB_STATIC) $(LIB_SHARED)
 
 clean:
 	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(LIB_STATIC) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h
@@ -72,11 +73,22 @@ $(BUILD_DIR)/%.o: %.cpp
 #create dependencies
 	@$(CXX) -MM -MT '$@' -c $< > $@.dep $(FLAGS) $(INCS)
 
-#create library
+#create static library
 $(LIB_STATIC): $(RESULT_DIR)/prepare.res $(BUILD_DIR)/prepare.bld $(OBJ)
 	@rm -fv $@
 	@printf "Create   %-60s" $@
 	@OUT=$$($(AR) $@ $(OBJ) 2>&1); \
+	if [ $$? -ne "0" ]; \
+	  then echo -e "${RED}[FAILED]${NC}";  echo -e "$$OUT"; \
+	else \
+	  echo -e "${GREEN}[DONE]${NC}"; \
+	fi
+
+#create shared library
+$(LIB_SHARED): $(RESULT_DIR)/prepare.res $(BUILD_DIR)/prepare.bld $(OBJ)
+	@rm -fv $@
+	@printf "Create   %-60s" $@
+	@OUT=$$($(CC) -shared $(OBJ) -o $@ 2>&1); \
 	if [ $$? -ne "0" ]; \
 	  then echo -e "${RED}[FAILED]${NC}";  echo -e "$$OUT"; \
 	else \
