@@ -224,14 +224,6 @@ bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Di
         }
     }
 
-    // if attribute is specified, then it's value is actually PC in caller's frame (address of invocation of callee)
-    if(dwarf_hasattr (result, DW_AT_low_pc) && dwarf_attr(result, DW_AT_low_pc, &attr_mem)) {
-        Dwarf_Addr low_pc;
-        if(!dwarf_formaddr(&attr_mem, &low_pc)) {
-            pst_log(SEVERITY_DEBUG, "DW_AT_low_pc: %#lX", low_pc);
-        }
-    }
-
     if(target == 0 && oname == NULL) {
         pst_log(SEVERITY_ERROR, "Cannot determine both call-site target and origin");
         return false;
@@ -240,6 +232,16 @@ bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Di
     Dwarf_Die child;
     if(dwarf_child (result, &child) == 0) {
         pst_call_site* st = pst_call_site_storage_add(storage, target, oname);
+
+        st->tail_call = (dwarf_hasattr(result, DW_AT_call_tail_call) != 0);
+
+        // if DW_AT_low_pc attribute is specified, then it's value is actually PC in caller's frame (address of invocation of callee)
+        if(dwarf_hasattr (result, DW_AT_low_pc) && dwarf_attr(result, DW_AT_low_pc, &attr_mem)) {
+            if(!dwarf_formaddr(&attr_mem, &st->call_pc)) {
+                pst_log(SEVERITY_DEBUG, "DW_AT_low_pc: %#lX", st->call_pc);
+            }
+        }
+
         if(!call_site_handle_dwarf(st, &child)) {
             pst_call_site_storage_del(storage, st);
             return false;

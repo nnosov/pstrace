@@ -48,8 +48,10 @@ typedef struct pst_call_site {
     hash_node       tgt_node;   // uplink to call-site by node dictionary
     hash_node       org_node;   // uplink to call-site by origin dictionary
 
-    uint64_t        target;     // pointer to callee function's (it's Low PC + base address)
+    uint64_t        target;     // pointer to callee function (it's Low PC + base address)
     char*           origin;     // name of callee function
+    Dwarf_Addr      call_pc;    // address of 'call' instruction to callee inside of caller
+    bool            tail_call;  // whether this a tail-call (jump) or normal call 'call'
     Dwarf_Die*      die;        // DIE of function for which this call site has parameters
     list_head       params;     // list of parameters and their values
     pst_context*    ctx;        // execution context
