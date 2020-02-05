@@ -50,7 +50,8 @@ SRC 		= $(shell find . -name '*.c')
 OBJ 		= $(BUILD_DIR)/main.o
 
 LIBS 		= -L./ -lpthread -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++ -liberty
-PST_LIBS	= ./build/libpst.a
+LIB_STATIC	= $(RESULT_DIR)/libpst.a
+LIB_DYNAMIC	= $(RESULT_DIR)/libpst.so
 
 INCS		= -I./include -I./src
 FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
@@ -60,11 +61,12 @@ FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_M
 
 all: $(BIN)
 
-$(PST_LIBS):
+$(LIB_STATIC):
 	@make -C ./src
 
 clean:
-	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h
+	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h \
+	    $(LIB_STATIC) $(LIB_DYNAMIC)
 	@make clean -C ./src
 	@if [ -z "$$(ls -A $(BUILD_DIR) 2>&1)" ]; then ${RM} -r $(BUILD_DIR); fi
 	@if [ -z "$$(ls -A $(RESULT_DIR) 2>&1)" ]; then ${RM} -r $(RESULT_DIR); fi
@@ -77,11 +79,11 @@ $(RESULT_DIR)/prepare.res:
 	@if [ ! -e $(RESULT_DIR) ]; then mkdir -vp $(RESULT_DIR); fi
 	@touch $@
 
-$(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(PST_LIBS)
+$(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(LIB_STATIC)
 	gcc -ggdb -O3 -o $(BUILD_DIR)/simple ./tests/simple.c
 	@make -C ./src
 	@printf "Create   %-60s" $@
-	@OUT=$$($(CXX) $(COLOR) -o $@ $(OBJ) $(PST_LIBS) $(LIBS) 2>&1); \
+	@OUT=$$($(CXX) $(COLOR) -o $@ $(OBJ) $(LIB_STATIC) $(LIBS) 2>&1); \
 	if [ $$? -ne "0" ]; \
 	  then echo -e "${RED}[FAILED]${NC}"; echo -e "$$OUT"; \
 	else \

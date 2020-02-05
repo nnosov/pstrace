@@ -45,7 +45,8 @@ FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D_GNU_SOURCE -D__STDC_FORMAT_MACROS -D
 all: $(LIB_STATIC) $(LIB_SHARED)
 
 clean:
-	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(LIB_STATIC) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h
+	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(LIB_STATIC) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h \
+	    $(LIB_STATIC) $(LIB_DYNAMIC) $(RESULT_DIR)/simple
 	@if [ -z "$$(ls -A $(BUILD_DIR) 2>&1)" ]; then ${RM} -r $(BUILD_DIR); fi
 	@if [ -z "$$(ls -A $(RESULT_DIR) 2>&1)" ]; then ${RM} -r $(RESULT_DIR); fi
 
