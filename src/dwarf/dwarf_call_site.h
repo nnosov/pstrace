@@ -16,7 +16,7 @@
 #include "../utils/list_head.h"
 #include "context.h"
 
-typedef struct pst_callee_info {
+typedef struct __pst_callee_info {
     Dwarf_Addr      target;
     char*           origin;
 } pst_callee_info;
@@ -25,7 +25,7 @@ typedef struct pst_callee_info {
 // -----------------------------------------------------------------------------------
 // DW_TAG_call_site_parameter
 // -----------------------------------------------------------------------------------
-typedef struct pst_call_site_param {
+typedef struct __pst_call_site_param {
     list_node           node;   // uplink. !!! must be first !!!
 
     Dwarf_Die*          param;      // reference to parameter DIE in callee (DW_AT_call_parameter)
@@ -43,7 +43,7 @@ void pst_call_site_param_fini(pst_call_site_param* param);
 // -----------------------------------------------------------------------------------
 // DW_TAG_call_site
 // -----------------------------------------------------------------------------------
-typedef struct pst_call_site {
+typedef struct __pst_call_site {
     list_node       node;       // uplink to list of call-sites
     hash_node       tgt_node;   // uplink to call-site by node dictionary
     hash_node       org_node;   // uplink to call-site by origin dictionary
@@ -68,7 +68,7 @@ typedef struct __pst_function pst_function;
 // -----------------------------------------------------------------------------------
 // storage for all of  function's call sites
 // -----------------------------------------------------------------------------------
-typedef struct pst_call_site_storage {
+typedef struct __pst_call_site_storage {
     pst_context*        ctx;
     list_head           call_sites;     // Call-Site definitions
     hash_head           cs_to_target;   // map pointer to caller to call-site

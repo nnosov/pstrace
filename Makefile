@@ -45,11 +45,11 @@ BIN  			= $(RESULT_DIR)/trace
 #source file search path. add here new directories which contains files specified for $(SRC)
 VPATH = ./tests
 
-SRC 		= $(shell find . -name '*.cpp')
+SRC 		= $(shell find . -name '*.c')
 #OBJ 		= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 OBJ 		= $(BUILD_DIR)/main.o
 
-LIBS 		= -L./ -lpthread -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++
+LIBS 		= -L./ -lpthread -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++ -liberty
 PST_LIBS	= ./build/libpst.a
 
 INCS		= -I./include -I./src
@@ -78,7 +78,7 @@ $(RESULT_DIR)/prepare.res:
 	@touch $@
 
 $(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(PST_LIBS)
-	gcc -ggdb -O3 -o $(BUILD_DIR)/simple ./tests/simple.cpp
+	gcc -ggdb -O3 -o $(BUILD_DIR)/simple ./tests/simple.c
 	@make -C ./src
 	@printf "Create   %-60s" $@
 	@OUT=$$($(CXX) $(COLOR) -o $@ $(OBJ) $(PST_LIBS) $(LIBS) 2>&1); \
@@ -92,7 +92,7 @@ $(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(PST_LIBS)
 	  fi; \
 	fi
 
-$(BUILD_DIR)/%.o: %.cpp
+$(BUILD_DIR)/%.o: %.c
 #compile source code directly to $BUILD_DIR directory
 	@printf "Building %-60s" $@
 	@OUT=$$($(CXX) $(COLOR) -o $@ -c $< $(FLAGS) $(INCS) 2>&1); \

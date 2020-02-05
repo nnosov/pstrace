@@ -38,11 +38,11 @@ typedef enum {
     ALLOC_CUSTOM = 2    // use custom allocator in predefined range of memory
 } pst_alloc_type;
 
-typedef struct pst_allocator {
+typedef struct __pst_allocator {
     // methods
-    void* (*alloc)(pst_allocator* alloc, uint32_t size);
-    void (*free)(pst_allocator* alloc, void* buff);
-    void* (*realloc)(pst_allocator* alloc, void* buff, uint32_t new_size);
+    void* (*alloc)(struct __pst_allocator* alloc, uint32_t size);
+    void (*free)(struct __pst_allocator* alloc, void* buff);
+    void* (*realloc)(struct __pst_allocator* alloc, void* buff, uint32_t new_size);
 
     // fields
     int             type;

@@ -99,7 +99,7 @@ int find_regnum(uint32_t op)
     return -1;
 }
 
-pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t& regval)
+pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t* regval)
 {
 #ifdef USE_LIBUNWIND
     int ret = unw_get_reg(ctx->curr_frame, regno, &regval);

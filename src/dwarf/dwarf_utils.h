@@ -15,10 +15,6 @@
 #include "dwarf_function.h"
 
 typedef struct __reginfo {
-    __reginfo() {
-        regname[0] = 0;
-        regno = -1;
-    }
     char regname[32];
     int regno;
 } reginfo;

@@ -34,7 +34,7 @@ void pst_del_handler(pst_handler* h)
 }
 
 // write stack trace information to provided file descriptor
-int pst_unwind_simple(pst_handler* h, FILE* fd)
+int pst_unwind_simple_fd(pst_handler* h, FILE* fd)
 {
     int ret = pst_handler_unwind(h);
     if(ret) {
@@ -62,7 +62,7 @@ int pst_unwind_simple(pst_handler* h, char* buff, uint32_t buff_size)
 
 
 // write stack trace information to provided file descriptor
-int pst_unwind_pretty(pst_handler* h, FILE* fd)
+int pst_unwind_pretty_fd(pst_handler* h, FILE* fd)
 {
     int ret = pst_handler_handle_dwarf(h);
     if(ret) {

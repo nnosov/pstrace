@@ -46,7 +46,7 @@ void pst_type_fini(pst_type* t)
 //
 // pst_parameter
 //
-void clear(pst_parameter* param)
+static void clear(pst_parameter* param)
 {
     pst_type* t = NULL;
     struct list_node  *pos, *tn;
@@ -56,7 +56,7 @@ void clear(pst_parameter* param)
     }
 }
 
-pst_type* next_type(pst_parameter* param, pst_type* t)
+static pst_type* next_type(pst_parameter* param, pst_type* t)
 {
     list_node* n = (t == NULL) ? list_first(&param->types) : list_next(&t->node);
     pst_type* ret = NULL;

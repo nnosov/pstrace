@@ -4,15 +4,16 @@
  *  Created on: Dec 28, 2019
  *      Author: nnosov
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
+#include <ucontext.h>
 
 #include <dwarf.h>
 #include <elfutils/libdwfl.h>
-#include <cxxabi.h>
 #include <execinfo.h>
 #include <inttypes.h>
 #include <dlfcn.h>
@@ -75,7 +76,7 @@ bool get_dwarf_function(pst_handler* h, pst_function* fun)
 	return nret;
 }
 
-pst_function* add_function(pst_handler* h, pst_function* parent)
+static pst_function* add_function(pst_handler* h, pst_function* parent)
 {
     pst_new(pst_function, fn, &h->ctx, parent);
     list_add_bottom(&h->functions, &fn->node);
@@ -83,13 +84,13 @@ pst_function* add_function(pst_handler* h, pst_function* parent)
     return fn;
 }
 
-void del_function(pst_function* fn)
+static void del_function(pst_function* fn)
 {
     list_del(&fn->node);
     pst_function_fini(fn);
 }
 
-void clear(pst_handler* h)
+static void clear(pst_handler* h)
 {
     pst_function*  fn = NULL;
     struct list_node  *pos, *tn;
@@ -99,7 +100,7 @@ void clear(pst_handler* h)
     }
 }
 
-pst_function* next_function(pst_handler* h, pst_function* fn)
+static pst_function* next_function(pst_handler* h, pst_function* fn)
 {
     list_node* n = (fn == NULL) ? list_first(&h->functions) : list_next(&fn->node);
     pst_function* ret = NULL;
@@ -110,7 +111,7 @@ pst_function* next_function(pst_handler* h, pst_function* fn)
     return ret;
 }
 
-pst_function* prev_function(pst_handler* h, pst_function* fn)
+static pst_function* prev_function(pst_handler* h, pst_function* fn)
 {
     list_node* n = (fn == NULL) ? list_last(&h->functions) : list_prev(&fn->node);
     pst_function* ret = NULL;
@@ -121,7 +122,7 @@ pst_function* prev_function(pst_handler* h, pst_function* fn)
     return ret;
 }
 
-pst_function* last_function(pst_handler* h)
+static pst_function* last_function(pst_handler* h)
 {
     list_node* n = list_last(&h->functions);
     if(n) {

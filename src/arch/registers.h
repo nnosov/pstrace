@@ -33,6 +33,6 @@ typedef enum {
     REG_EXPR_ERROR
 } pst_reg_error;
 
-pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t& regval);
+pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t* regval);
 
 #endif /* __PST_REGISTERS_H__ */

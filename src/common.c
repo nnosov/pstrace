@@ -45,8 +45,8 @@ uint32_t decode_uleb128(uint8_t *uleb128)
 }
 
 // Utility function to encode a ULEB128 value to a buffer. Returns
-// the length in bytes of the encoded value.
-inline unsigned encode_uleb128(uint64_t value, uint8_t *p, unsigned PadTo = 0)
+// the length in bytes of the encoded value. by default PadTo = 0
+inline unsigned encode_uleb128(uint64_t value, uint8_t *p, unsigned PadTo)
 {
 	uint8_t *orig_p = p;
 	unsigned count = 0;
@@ -70,8 +70,8 @@ inline unsigned encode_uleb128(uint64_t value, uint8_t *p, unsigned PadTo = 0)
 }
 
 // Utility function to encode a SLEB128 value to a buffer. Returns
-// the length in bytes of the encoded value.
-inline unsigned encode_sleb128(int64_t value, uint8_t *p, unsigned PadTo = 0)
+// the length in bytes of the encoded value. by default PadTo = 0
+inline unsigned encode_sleb128(int64_t value, uint8_t *p, unsigned PadTo)
 {
 	uint8_t *orig_p = p;
 	unsigned count = 0;

@@ -29,7 +29,6 @@ uint32_t Fun1(const int arg1, my_int arg2, uint32_t arg3)
 
 #include <ucontext.h>
 #include <execinfo.h>
-#include <cxxabi.h>
 #include <signal.h>
 #include <limits.h>
 #include <sys/types.h>
@@ -39,7 +38,7 @@ uint32_t Fun1(const int arg1, my_int arg2, uint32_t arg3)
 
 typedef void (*sig_handler_t)(int sig);
 
-void SetSignalHandler(sig_handler_t handler = 0);
+void SetSignalHandler(sig_handler_t handler);
 
 void SigusrHandler(int sig)
 {
@@ -69,9 +68,9 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 	        return;
 	    }
 
-	    int ret = pst_unwind_simple(handler, stdout);
+	    int ret = pst_unwind_simple_fd(handler, stdout);
 	    if(!ret) {
-	        pst_unwind_pretty(handler, stdout);
+	        pst_unwind_pretty_fd(handler, stdout);
 	    } else {
 	        printf("No stack trace obtained\n");
 	    }
@@ -94,7 +93,7 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 void SignalHandler(int sig)
 {
     // do nothing and reset to our handler back
-	SetSignalHandler();
+	SetSignalHandler(0);
 }
 
 #include <sys/time.h>

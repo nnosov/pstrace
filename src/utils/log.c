@@ -1,6 +1,7 @@
 
 #include <time.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "log.h"
 
@@ -202,12 +203,12 @@ void close_file(pst_log* log)
     fsp->max_bytes = 0;
 }
 
-bool is_file_opened(pst_log* log)
+int is_file_opened(pst_log* log)
 {
     file_spec* fsp = (file_spec*)log->child;
     if(!fsp) {
         fprintf(stderr, "Wrong initialization of File-based logger while check open\n");
-        return false;
+        return 0;
     }
     return (fsp->fd != 0);
 }

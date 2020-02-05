@@ -54,7 +54,7 @@ void pst_call_site_param_fini(pst_call_site_param* param)
 // -----------------------------------------------------------------------------------
 // pst_call_site
 // -----------------------------------------------------------------------------------
-pst_call_site_param* add_param(pst_call_site* site)
+static pst_call_site_param* add_param(pst_call_site* site)
 {
     pst_call_site_param* p = pst_call_site_param_new();
     pst_call_site_param_init(p);
@@ -63,13 +63,13 @@ pst_call_site_param* add_param(pst_call_site* site)
     return p;
 }
 
-void del_param(pst_call_site*, pst_call_site_param* p)
+static void del_param(pst_call_site_param* p)
 {
     list_del(&p->node);
     pst_call_site_param_fini(p);
 }
 
-pst_call_site_param* next_param(pst_call_site* site, pst_call_site_param* p)
+static pst_call_site_param* next_param(pst_call_site* site, pst_call_site_param* p)
 {
     list_node* n = (p == NULL) ? list_first(&site->params) : list_next(&p->node);
     pst_call_site_param* ret = NULL;
@@ -109,7 +109,7 @@ bool call_site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                     attr = dwarf_attr(child, DW_AT_location, &attr_mem);
                     if(!handle_location(site->ctx, attr, &param->location, pc, NULL)) {
                         pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
-                        del_param(site, param);
+                        del_param(param);
                         return false;
                     }
                     pst_log(SEVERITY_DEBUG, "  DW_AT_location: %s", site->ctx->buff);
@@ -126,7 +126,7 @@ bool call_site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                         pst_log(SEVERITY_DEBUG, "  DW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
                     } else {
                         pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
-                        del_param(site, param);
+                        del_param(param);
                         pst_dwarf_expr_fini(&loc);
                         return false;
                     }
@@ -320,8 +320,8 @@ void pst_call_site_storage_init(pst_call_site_storage* storage, pst_context* ctx
 {
     storage->ctx = ctx;
     list_head_init(&storage->call_sites);
-    hash_head_init(&storage->cs_to_target);
-    hash_head_init(&storage->cs_to_origin);
+    hash_head_init(&storage->cs_to_target, HASH_MIN_SHIFT, 0, 0);
+    hash_head_init(&storage->cs_to_origin, HASH_MIN_SHIFT, 0 ,0);
     storage->allocated = false;
 }
 

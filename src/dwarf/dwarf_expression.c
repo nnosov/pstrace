@@ -54,7 +54,7 @@ void pst_dwarf_op_fini(pst_dwarf_op* dwop)
 //
 // pst_dwarf_expr
 //
-pst_dwarf_op* add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1, uint64_t arg2)
+static pst_dwarf_op* add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1, uint64_t arg2)
 {
     pst_new(pst_dwarf_op, op, operation, arg1, arg2);
     list_add_bottom(&expr->operations, &op->node);
@@ -62,7 +62,7 @@ pst_dwarf_op* add_op(pst_dwarf_expr* expr, uint8_t operation, uint64_t arg1, uin
     return op;
 }
 
-pst_dwarf_op* next_op(pst_dwarf_expr* expr, pst_dwarf_op* op)
+static pst_dwarf_op* next_op(pst_dwarf_expr* expr, pst_dwarf_op* op)
 {
     struct list_node* n = (op == NULL) ? list_first(&expr->operations) : list_next(&op->node);
 
@@ -74,7 +74,7 @@ pst_dwarf_op* next_op(pst_dwarf_expr* expr, pst_dwarf_op* op)
     return ret;
 }
 
-void clean(pst_dwarf_expr* expr)
+static void clean(pst_dwarf_expr* expr)
 {
     pst_dwarf_op* op = NULL;
     struct list_node  *pos, *tn;

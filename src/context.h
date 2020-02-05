@@ -13,6 +13,7 @@
 #include <execinfo.h>
 #include <libunwind.h>
 #include <elfutils/libdwfl.h>
+#include <stdbool.h>
 
 #include "utils/allocator.h"
 #include "utils/log.h"
@@ -27,13 +28,13 @@ extern pst_allocator    allocator;  // custom allocator for PST library
 
 char* pst_strdup(const char* str);
 
-typedef struct pst_context {
+typedef struct __pst_context {
     // methods
-    void (*clean_print)     (pst_context* ctx);
-    bool (*print)           (pst_context* ctx, const char* fmt, ...);
-    bool (*print_expr)      (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr);
-    void (*print_registers) (pst_context* ctx, int from, int to);
-    void (*print_stack)     (pst_context* ctx, int max, uint64_t next_cfa);
+    void (*clean_print)     (struct __pst_context* ctx);
+    bool (*print)           (struct __pst_context* ctx, const char* fmt, ...);
+    bool (*print_expr)      (struct __pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr);
+    void (*print_registers) (struct __pst_context* ctx, int from, int to);
+    void (*print_stack)     (struct __pst_context* ctx, int max, uint64_t next_cfa);
 
     // fields
     ucontext_t*                 hcontext;   // context of signal handler

@@ -9,6 +9,7 @@
 #define __PST_DWARF_STACK_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "common.h"
 #include "context.h"
@@ -86,10 +87,10 @@ void pst_dwarf_stack_init(pst_dwarf_stack* st, pst_context* ctx);
 pst_dwarf_stack* pst_dwarf_stack_new(pst_context* ctx);
 void pst_dwarf_stack_fini(pst_dwarf_stack* st);
 
-bool pst_dwarf_stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun = NULL);
+bool pst_dwarf_stack_calc(pst_dwarf_stack* st, Dwarf_Op *exprs, int expr_len, Dwarf_Attribute* attr, pst_function* fun);
 void pst_dwarf_stack_clear(pst_dwarf_stack* st);
 bool pst_dwarf_stack_get_value(pst_dwarf_stack* st, uint64_t* value);
-pst_dwarf_value* pst_dwarf_stack_get(pst_dwarf_stack* st, uint32_t idx = 0);
+pst_dwarf_value* pst_dwarf_stack_get(pst_dwarf_stack* st, uint32_t idx);
 pst_dwarf_value* pst_dwarf_stack_pop(pst_dwarf_stack* st);
 void pst_dwarf_stack_push_value(pst_dwarf_stack* st, pst_dwarf_value* value);
 void pst_dwarf_stack_push(pst_dwarf_stack* st, void* v, uint32_t s, int t);

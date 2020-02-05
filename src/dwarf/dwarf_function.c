@@ -8,7 +8,9 @@
 
 #include <dwarf.h>
 #include <stdlib.h>
-#include <cxxabi.h>
+#include <libiberty/demangle.h>
+#include <stdio.h>
+
 
 #include "dwarf_stack.h"
 #include "dwarf_utils.h"
@@ -17,7 +19,7 @@
 // -----------------------------------------------------------------------------------
 // pst_function
 // -----------------------------------------------------------------------------------
-bool get_frame(pst_function* fn)
+static bool get_frame(pst_function* fn)
 {
     // get CFI (Call Frame Information) for current module
     // from handle_cfi()
@@ -85,7 +87,7 @@ bool get_frame(pst_function* fn)
     return true;
 }
 
-pst_parameter* add_param(pst_function* fn)
+static pst_parameter* add_param(pst_function* fn)
 {
     pst_new(pst_parameter, p, fn->ctx);
     list_add_bottom(&fn->params, &p->node);
@@ -93,13 +95,13 @@ pst_parameter* add_param(pst_function* fn)
     return p;
 }
 
-void del_param(pst_parameter* p)
+static void del_param(pst_parameter* p)
 {
     list_del(&p->node);
     pst_free(p);
 }
 
-void clear(pst_function* fn)
+static void clear(pst_function* fn)
 {
     pst_parameter*  param = NULL;
     struct list_node  *pos, *tn;
@@ -111,7 +113,7 @@ void clear(pst_function* fn)
     pst_call_site_storage_fini(&fn->call_sites);
 }
 
-pst_parameter* next_param(pst_function* fn, pst_parameter* p)
+static pst_parameter* next_param(pst_function* fn, pst_parameter* p)
 {
     struct list_node* n = (p == NULL) ? list_first(&fn->params) : list_next(&p->node);
 
@@ -400,8 +402,7 @@ bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr)
     const char* addrname = dwfl_module_addrname(fn->ctx->module, addr);
     char* demangle_name = NULL;
     if(addrname) {
-        int status;
-        demangle_name = abi::__cxa_demangle(addrname, NULL, NULL, &status);
+        demangle_name = cplus_demangle(addrname, 0);
         char* function_name = NULL;
         if(asprintf(&function_name, "%s%s", demangle_name ? demangle_name : addrname, demangle_name ? "" : "()") == -1) {
             pst_log(SEVERITY_ERROR, "Failed to allocate memory");
@@ -424,7 +425,7 @@ bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr)
     return true;
 }
 
-void pst_function_init(pst_function* fn, pst_context* _ctx, __pst_function* _parent)
+void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _parent)
 {
     list_node_init(&fn->node);
 
@@ -448,7 +449,7 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, __pst_function* _par
     fn->allocated = false;
 }
 
-pst_function* pst_function_new(pst_context* _ctx, __pst_function* _parent)
+pst_function* pst_function_new(pst_context* _ctx, pst_function* _parent)
 {
     pst_function* fn = pst_alloc(pst_function);
     if(fn) {

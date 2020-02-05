@@ -31,7 +31,7 @@ int regname_callback (void *arg, int regno, const char *setname, const char *pre
     return 0;
 }
 
-bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, pst_dwarf_expr* loc, Dwarf_Addr pc, pst_function* fun = NULL)
+bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, pst_dwarf_expr* loc, Dwarf_Addr pc, pst_function* fun)
 {
     ctx->clean_print(ctx);
     Dwarf_Addr offset = pc - ctx->base_addr;

@@ -14,12 +14,12 @@
 @param key_size hash key size in bytes
 @param node uplink to hash multimap table
 */
-struct hash_node
+typedef struct hash_node
 {
     char                *key;
     int                 key_size;
     struct list_node    node;
-};
+} hash_node;
 
 /** Hash function prototype
 
@@ -48,7 +48,7 @@ typedef int (*_compare_fn)(const void *key1, const void *key2, int size);
 hash multimap table
 @param count count of the nodes in the hash table
 */
-struct hash_head
+typedef struct hash_head
 {
     unsigned char       hash_shift;
     unsigned short      hash_size;
@@ -58,7 +58,7 @@ struct hash_head
 
     _hash_fn            hash_fn;
     _compare_fn         compare_fn;
-};
+} hash_head;
 
 /** Hash table iterator
 
@@ -76,7 +76,7 @@ struct hash_iterator
 void hash_node_init(struct hash_node *node);
 void hash_node_cleanup(struct hash_node *node);
 
-int hash_head_init(struct hash_head *map, unsigned int hash_shift = HASH_MIN_SHIFT, _hash_fn hf = 0, _compare_fn cf = 0);
+int hash_head_init(struct hash_head *map, unsigned int hash_shift, _hash_fn hf, _compare_fn cf);
 void hash_head_cleanup(struct hash_head *map);
 
 struct hash_node* hash_find(struct hash_head *map, const void *key, int key_size);
