@@ -15,14 +15,14 @@
 #include "common.h"
 #include "context.h"
 
-typedef struct pst_context pst_context;
-
 typedef struct pst_handler {
 	pst_context	    ctx;		// context of unwinding
 	list_head	    functions;	// list of functions in stack frame
+	bool            allocated;  // whether this object was allocated or not
 } pst_handler;
 
 void pst_handler_init(pst_handler* h, ucontext_t* hctx);
+pst_handler* pst_handler_new(ucontext_t* hctx);
 void pst_handler_fini(pst_handler* h);
 
 bool pst_handler_handle_dwarf(pst_handler* h);

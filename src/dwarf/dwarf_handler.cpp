@@ -268,6 +268,19 @@ void pst_handler_init(pst_handler* h, ucontext_t* hctx)
 {
     pst_context_init(&h->ctx, hctx);
     list_head_init(&h->functions);
+    h->allocated = false;
+}
+
+pst_handler* pst_handler_new(ucontext_t* hctx)
+{
+    pst_handler* handler = pst_alloc(pst_handler);
+
+    if(handler) {
+        pst_handler_init(handler, hctx);
+        handler->allocated = true;
+    }
+
+    return handler;
 }
 
 void pst_handler_fini(pst_handler* h)
