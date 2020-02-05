@@ -20,12 +20,13 @@ extern int regnum;
 pst_log         logger;     // logger for library
 pst_allocator   allocator;  // custom allocator for PST library
 
-void clean_print(pst_context* ctx) {
+static void clean_print(pst_context* ctx)
+{
     ctx->buff[0] = 0;
     ctx->offset = 0;
 }
 
-void print_stack(pst_context* ctx, int max, uint64_t next_cfa)
+static void print_stack(pst_context* ctx, int max, uint64_t next_cfa)
 {
     pst_log(SEVERITY_DEBUG, "CFA = %#lX, NEXT_CFA = %#lX, SP = %#lX", ctx->cfa, next_cfa, ctx->sp);
     ctx->clean_print(ctx);
@@ -44,7 +45,7 @@ void print_stack(pst_context* ctx, int max, uint64_t next_cfa)
     }
 }
 
-void print_registers(pst_context* ctx, int from, int to)
+static void print_registers(pst_context* ctx, int from, int to)
 {
     ctx->clean_print(ctx);
     for(int i = from; i < regnum && i <= to; ++i) {
@@ -57,7 +58,7 @@ void print_registers(pst_context* ctx, int from, int to)
     }
 }
 
-bool print(pst_context* ctx, const char* fmt, ...)
+static bool print(pst_context* ctx, const char* fmt, ...)
 {
     bool nret = true;
 
@@ -74,7 +75,7 @@ bool print(pst_context* ctx, const char* fmt, ...)
     return nret;
 }
 
-bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr)
+static bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Attribute* attr)
 {
     ctx->clean_print(ctx);
     for (int i = 0; i < exprlen; i++) {

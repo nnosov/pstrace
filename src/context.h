@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef FRAMEWORK_CONTEXT_H_
-#define FRAMEWORK_CONTEXT_H_
+#ifndef __PST_CONTEXT_H__
+#define __PST_CONTEXT_H__
 
 #include <string.h>
 #include <stdlib.h>
@@ -58,4 +58,4 @@ typedef struct __pst_context {
 void pst_context_init(pst_context* ctx, ucontext_t* hctx);
 void pst_context_fini(pst_context* ctx);
 
-#endif /* FRAMEWORK_CONTEXT_H_ */
+#endif /* __PST_CONTEXT_H__ */
