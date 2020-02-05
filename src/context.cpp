@@ -151,10 +151,6 @@ bool print_expr_block (pst_context* ctx, Dwarf_Op *exprs, int exprlen, Dwarf_Att
 
 void pst_context_init(pst_context* ctx, ucontext_t* hctx)
 {
-    // global
-    pst_alloc_init(&allocator);
-    pst_log_init_console(&logger);
-
     // methods
     ctx->clean_print = clean_print;
     ctx->print = print;
@@ -184,10 +180,6 @@ void pst_context_fini(pst_context* ctx)
     ctx->frame = NULL;
     ctx->dwfl = NULL;
     ctx->module = NULL;
-
-    // global
-    pst_log_fini(&logger);
-    pst_alloc_fini(&allocator);
 }
 
 

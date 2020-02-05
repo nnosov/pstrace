@@ -31,7 +31,7 @@ SOFT_BUILD	= $(shell STR=`cat $(BUILD_DIR)/version.h 2> /dev/null | grep 'SOFT_B
 DATE_BUILD	= $(shell date +"%D %T")
 
 #source and header files search path. add here new directories which contains files specified for $(SRC)
-VPATH 		= . dwarf arch utils
+VPATH 		= ./ ./dwarf ./arch ./utils
 
 SRC			= $(wildcard $(addsuffix /*.cpp,${VPATH}))
 OBJ			= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))

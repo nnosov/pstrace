@@ -10,31 +10,39 @@
 
 //system
 #include <ucontext.h>
-/*
-#include <netdb.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <vector>
-#include <string.h>
-#include <libunwind.h>
-#include <elfutils/libdwfl.h>
-#include <dlfcn.h>
-#include <stdlib.h>
-*/
+#include <stdint.h>
 
-#include "utils/list_head.h"
-#include "context.h"
+typedef struct pst_handler pst_handler;
 
-typedef struct pst_handler {
-	pst_context					ctx;		// context of unwinding
-	list_head	                functions;	// list of functions in stack frame
-} pst_handler;
-void pst_handler_init(pst_handler* h, ucontext_t* hctx);
-void pst_handler_fini(pst_handler* h);
+// allocate and initialize libpst handler.
+pst_handler* pst_new_handler(ucontext_t* hctx);
 
-bool pst_handler_handle_dwarf(pst_handler* h);
-void pst_handler_print_dwarf(pst_handler* h);
-bool pst_handler_unwind(pst_handler* h);
+// deallocate libpst handler
+void pst_del_handler(pst_handler* h);
+
+
+//
+// Base unwind routines.
+// Unwinds current stack trace using base information about program (i.e. print out address, function name)
+//
+
+// write stack trace information to provided file descriptor
+int pst_unwind_simple(pst_handler* h, FILE* fd);
+
+// save stack trace information to provided buffer in RAM
+int pst_unwind_simple(pst_handler* h, char* buff, uint32_t buff_size);
+
+
+// Advanced unwind routines.
+// Unwinds current stack trace using DWARF debug sections in file if they present and print it to provided file descriptor.
+// Additionally to pst_unwind_simple(...) provides types of parameters and variables in functions and their values
+//
+
+// write stack trace information to provided file descriptor
+int pst_unwind_pretty(pst_handler* h, FILE* fd);
+
+// save stack trace information to provided buffer in RAM
+int pst_unwind_pretty(pst_handler* h, char* buff, uint32_t buff_size);
 
 #endif /* PST_HANDLER_H_ */

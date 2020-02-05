@@ -1,9 +1,9 @@
 //system
 #include <stdlib.h>
 #include <fcntl.h>
+#include <stdint.h>
 
-#include "dwarf/dwarf_handler.h"
-#include "context.h"
+#include "../include/libpst.h"
 
 typedef enum {
 	DEF_1 = 1,
@@ -35,6 +35,7 @@ uint32_t Fun1(const int arg1, my_int arg2, uint32_t arg3)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 
 typedef void (*sig_handler_t)(int sig);
 
@@ -59,23 +60,25 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 
     fatal_error_in_progress = 1;
 
-    pst_log(SEVERITY_ERROR, "%s signal handled", strsignal(sig));
-    bool ret = false;
-    pst_decl(pst_handler, handler, (ucontext_t*)context);
-
+    printf("%s signal handled\n", strsignal(sig));
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    ret = pst_handler_unwind(&handler);
+	    pst_handler* handler = pst_new_handler((ucontext_t*)context);
+	    if(!handler) {
+	        printf("Failed to allocate pst handler\n");
+	        return;
+	    }
+
+	    int ret = pst_unwind_simple(handler, stdout);
+	    if(!ret) {
+	        pst_unwind_pretty(handler, stdout);
+	    } else {
+	        printf("No stack trace obtained\n");
+	    }
+
+	    pst_del_handler(handler);
     }
 
-	if(ret) {
-	    pst_log(SEVERITY_INFO, "%s", handler.ctx.buff);
-	    pst_handler_handle_dwarf(&handler);
-	    pst_handler_print_dwarf(&handler);
-	    pst_log(SEVERITY_INFO, "%s", handler.ctx.buff);
-	} else {
-	    pst_log(SEVERITY_ERROR, "No stack trace obtained");
-	}
 
     // comment out line below to prevent coredump
     // exit(EXIT_FAILURE);
@@ -90,20 +93,7 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 
 void SignalHandler(int sig)
 {
-//	if (handled_error_in_progress)
-//		raise (sig);
-//	handled_error_in_progress = 1;
-
-//	const char* str_sig = strsignal(sig);
-//	logger->Log(SEVERITY_INFO, "%s received.", str_sig);
-	if(sig == SIGUSR1) {
-		pst_log(SEVERITY_INFO, "Maintenance mode enabled.");
-	} else if(sig == SIGUSR2) {
-		pst_log(SEVERITY_INFO, "Maintenance mode disabled.");
-	}
-//	signal (sig, SIG_DFL);
-//	raise(sig);
-	// reset to our handler back
+    // do nothing and reset to our handler back
 	SetSignalHandler();
 }
 
@@ -117,7 +107,6 @@ void SetSignalHandler(sig_handler_t handler)
 	sigfillset(&ss);
 
 	//remove previous handlers
-//	sigdelset(&ss, SIGINT);
 	sigdelset(&ss, SIGUSR1);
 	sigdelset(&ss, SIGUSR2);
 	sigdelset(&ss, SIGSEGV);
@@ -135,10 +124,6 @@ void SetSignalHandler(sig_handler_t handler)
 	// cleanup
 	sa.sa_handler = NULL;
 	sa.sa_sigaction = NULL;
-
-//	//set interrupt signal
-//	sa.sa_handler = SignalHandler;
-//	sigaction(SIGINT, &sa, 0);
 
 	//set stop signal
 	sa.sa_handler = (handler == NULL) ? SignalHandler : handler;
@@ -176,7 +161,7 @@ void SetSignalHandler(sig_handler_t handler)
 	limit.rlim_max = 1073741824;
 	if (setrlimit(RLIMIT_CORE, &limit))
 	{
-		pst_log(SEVERITY_DEBUG, "Failed to set limit for core dump file size");
+		printf("Failed to set limit for core dump file size\n");
 	}
 }
 
@@ -192,8 +177,6 @@ void ResetSignalHandler() {
 
 int main(int argc, char* argv[])
 {
-    pst_log_init_console(&logger);
-    //logger->SetCurrentSeverity(SEVERITY_INFO);
     SetSignalHandler(SigusrHandler);
 
     Fun1(1, DEF_2, 5);
