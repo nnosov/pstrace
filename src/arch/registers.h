@@ -1,4 +1,16 @@
-#pragma once
+#ifndef __PST_REGISTERS_H__
+#define __PST_REGISTERS_H__
+
+/*
+ * registers.cpp
+ *
+ * x86_64 registers mapping to DWARF registers
+ *
+ *  Created on: Jan 27, 2020
+ *      Author: nnosov
+ */
+
+
 
 #include <stdint.h>
 #include <string.h>
@@ -22,3 +34,5 @@ typedef enum {
 } pst_reg_error;
 
 pst_reg_error pst_get_reg(pst_context* ctx, int regno, uint64_t& regval);
+
+#endif /* __PST_REGISTERS_H__ */

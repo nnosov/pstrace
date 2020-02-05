@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (c) 2006, Nikolay Nosov
+Copyright (c) 2006, Nikolai Nosov
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,

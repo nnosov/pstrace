@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef PST_HANDLER_H_
-#define PST_HANDLER_H_
+#ifndef __PST_DWARF_HANDLER_H__
+#define __PST_DWARF_HANDLER_H__
 
 //system
 #include <ucontext.h>
@@ -29,4 +29,4 @@ bool pst_handler_handle_dwarf(pst_handler* h);
 void pst_handler_print_dwarf(pst_handler* h);
 bool pst_handler_unwind(pst_handler* h);
 
-#endif /* PST_HANDLER_H_ */
+#endif /* __PST_DWARF_HANDLER_H__ */

@@ -5,13 +5,13 @@
  *      Author: nnosov
  */
 
-#include "../src/dwarf/dwarf_parameter.h"
 
 #include <dwarf.h>
 #include <elfutils/libdw.h>
 
-#include "../src/dwarf/dwarf_utils.h"
+#include "dwarf_utils.h"
 #include "context.h"
+#include "dwarf_parameter.h"
 
 //
 // pst_type

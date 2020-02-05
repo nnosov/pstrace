@@ -10,8 +10,8 @@
 
 #include "context.h"
 
-#include "../src/dwarf/dwarf_operations.h"
-#include "registers.h"
+#include "dwarf/dwarf_operations.h"
+#include "arch/registers.h"
 
 
 extern dwarf_reg_map    reg_map[];

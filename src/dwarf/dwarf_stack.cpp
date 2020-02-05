@@ -5,16 +5,16 @@
  *      Author: nnosov
  */
 
-#include "../src/dwarf/dwarf_stack.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <dwarf.h>
 
-#include "../src/dwarf/dwarf_operations.h"
-#include "../utils/allocator.h"
-#include "../utils/list_head.h"
+#include "utils/allocator.h"
+#include "utils/list_head.h"
+#include "dwarf_operations.h"
 #include "dwarf_handler.h"
+#include "dwarf_stack.h"
 
 // -----------------------------------------------------------------------------------
 // DWARF Stack value

@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef SRC_DWARF_DWARF_CALL_SITE_H_
-#define SRC_DWARF_DWARF_CALL_SITE_H_
+#ifndef __PST_DWARF_CALL_SITE_H__
+#define __PST_DWARF_CALL_SITE_H__
 
 #include <inttypes.h>
 #include <elfutils/libdw.h>
@@ -87,4 +87,4 @@ void pst_call_site_storage_del(pst_call_site_storage* storage, pst_call_site* st
 void pst_call_site_storage_del(pst_call_site_storage* storage, pst_call_site* st);
 
 
-#endif /* SRC_DWARF_DWARF_CALL_SITE_H_ */
+#endif /* __PST_DWARF_CALL_SITE_H__ */

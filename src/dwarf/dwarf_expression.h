@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef SRC_DWARF_DWARF_EXPRESSION_H_
-#define SRC_DWARF_DWARF_EXPRESSION_H_
+#ifndef __PST_DWARF_EXPRESSION_H__
+#define __PST_DWARF_EXPRESSION_H__
 
 #include <inttypes.h>
 #include <elfutils/libdwfl.h>
@@ -46,4 +46,4 @@ bool pst_dwarf_expr_equal(pst_dwarf_expr* lhs, pst_dwarf_expr* rhs);
 bool pst_dwarf_expr_print_op(pst_dwarf_expr* expr, const char* fmt, ...);
 void pst_dwarf_expr_set_value(pst_dwarf_expr* expr, uint64_t v);
 
-#endif /* SRC_DWARF_DWARF_EXPRESSION_H_ */
+#endif /* __PST_DWARF_EXPRESSION_H__ */

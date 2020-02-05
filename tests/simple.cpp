@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-
 void do_stuff(int my_arg)
 {
     int my_local = my_arg + 2;
@@ -9,7 +8,6 @@ void do_stuff(int my_arg)
     for (i = 0; i < my_local; ++i)
         printf("i = %d\n", i);
 }
-
 
 int main()
 {

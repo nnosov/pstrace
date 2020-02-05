@@ -1,4 +1,13 @@
-#pragma once
+#ifndef __PST_DWARF_OPERATIONS_H__
+#define __PST_DWARF_OPERATIONS_H__
+
+/*
+ * dwarf_operations.cpp
+ *
+ *  Created on: Jan 11, 2020
+ *      Author: nnosov
+ */
+
 
 #include <elfutils/libdwfl.h>
 
@@ -20,3 +29,5 @@ typedef struct __dwarf_op_map {
 } dwarf_op_map;
 
 const dwarf_op_map* find_op_map(int op);
+
+#endif /* __PST_DWARF_OPERATIONS_H__ */

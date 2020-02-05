@@ -1,7 +1,8 @@
-#include "../../src/utils/log.h"
 
 #include <time.h>
 #include <stdlib.h>
+
+#include "log.h"
 
 const char * const severity_map[] = {
 		" [DEBUG]  : ",

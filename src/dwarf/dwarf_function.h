@@ -5,14 +5,17 @@
  *      Author: nnosov
  */
 
-#ifndef SRC_DWARF_DWARF_FUNCTION_H_
-#define SRC_DWARF_DWARF_FUNCTION_H_
+#ifndef __PST_DWARF_FUNCTION_H__
+#define __PST_DWARF_FUNCTION_H__
 
-#include "../src/dwarf/dwarf_call_site.h"
-#include "../src/dwarf/dwarf_expression.h"
-#include "../src/dwarf/dwarf_parameter.h"
-#include "../utils/list_head.h"
+#include <elfutils/libdw.h>
+#include <libunwind.h>
+
+#include "utils/list_head.h"
 #include "context.h"
+#include "dwarf_call_site.h"
+#include "dwarf_expression.h"
+#include "dwarf_parameter.h"
 
 // -----------------------------------------------------------------------------------
 // pst_function
@@ -46,4 +49,4 @@ bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr);
 bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d);
 bool pst_function_print_dwarf(pst_function* fn);
 
-#endif /* SRC_DWARF_DWARF_FUNCTION_H_ */
+#endif /* __PST_DWARF_FUNCTION_H__ */

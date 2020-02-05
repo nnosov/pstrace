@@ -14,8 +14,8 @@
 #include <libunwind.h>
 #include <elfutils/libdwfl.h>
 
-#include "../src/utils/allocator.h"
-#include "../src/utils/log.h"
+#include "utils/allocator.h"
+#include "utils/log.h"
 
 extern pst_log          logger;     // logger for whole PST library
 extern pst_allocator    allocator;  // custom allocator for PST library

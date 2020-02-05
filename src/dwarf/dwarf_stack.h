@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef SRC_DWARF_DWARF_STACK_H_
-#define SRC_DWARF_DWARF_STACK_H_
+#ifndef __PST_DWARF_STACK_H__
+#define __PST_DWARF_STACK_H__
 
 #include <stdint.h>
 
@@ -94,4 +94,4 @@ pst_dwarf_value* pst_dwarf_stack_pop(pst_dwarf_stack* st);
 void pst_dwarf_stack_push_value(pst_dwarf_stack* st, pst_dwarf_value* value);
 void pst_dwarf_stack_push(pst_dwarf_stack* st, void* v, uint32_t s, int t);
 
-#endif /* SRC_DWARF_DWARF_STACK_H_ */
+#endif /* __PST_DWARF_STACK_H__ */

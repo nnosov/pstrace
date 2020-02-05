@@ -1,5 +1,5 @@
-#ifndef PST_LOG_H_
-#define PST_LOG_H_
+#ifndef __PST_LOG_H_
+#define __PST_LOG_H_
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -20,9 +20,7 @@ enum SC_LogSeverity {
 
 #define LOG_BUFF_SIZE       (1024*1024)
 
-typedef struct __pst_log pst_log;
-
-typedef struct __pst_log {
+typedef struct pst_log {
     // methods
     void (*close) (pst_log* log);
     bool (*open) (pst_log* log);
@@ -47,4 +45,4 @@ void pst_log_init_console(pst_log* log);
 void pst_log_init_file(pst_log* log, const char* path, uint64_t max_bytes = 64 * 1024 * 1024/* 64Mb */);
 void pst_log_fini(pst_log* log);
 
-#endif /* PST_LOG_H_ */
+#endif /* __PST_LOG_H_ */

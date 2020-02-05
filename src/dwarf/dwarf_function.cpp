@@ -5,14 +5,14 @@
  *      Author: nnosov
  */
 
-#include "../src/dwarf/dwarf_function.h"
 
 #include <dwarf.h>
 #include <stdlib.h>
 #include <cxxabi.h>
 
-#include "../src/dwarf/dwarf_stack.h"
-#include "../src/dwarf/dwarf_utils.h"
+#include "dwarf_stack.h"
+#include "dwarf_utils.h"
+#include "dwarf_function.h"
 
 // -----------------------------------------------------------------------------------
 // pst_function

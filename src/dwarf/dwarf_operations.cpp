@@ -5,13 +5,13 @@
  *      Author: nnosov
  */
 
-#include "../src/dwarf/dwarf_operations.h"
 
 #include <dwarf.h>
 #include <inttypes.h>
 
 #include "common.h"
 #include "registers.h"
+#include "dwarf_operations.h"
 
 // not implemented operations
 bool dw_op_notimpl(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)

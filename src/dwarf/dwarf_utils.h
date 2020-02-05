@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef SRC_DWARF_DWARF_UTILS_H_
-#define SRC_DWARF_DWARF_UTILS_H_
+#ifndef __PST_DWARF_UTILS_H__
+#define __PST_DWARF_UTILS_H__
 
 #include <elfutils/libdw.h>
 
@@ -27,4 +27,4 @@ int regname_callback (void *arg, int regno, const char *setname, const char *pre
 bool handle_location(pst_context* ctx, Dwarf_Attribute* attr, pst_dwarf_expr* loc, Dwarf_Addr pc, pst_function* fun);
 bool is_location_form(int form);
 
-#endif /* SRC_DWARF_DWARF_UTILS_H_ */
+#endif /* __PST_DWARF_UTILS_H__ */

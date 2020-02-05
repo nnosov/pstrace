@@ -5,14 +5,14 @@
  *      Author: nnosov
  */
 
-#ifndef SRC_DWARF_DWARF_PARAMETER_H_
-#define SRC_DWARF_DWARF_PARAMETER_H_
+#ifndef __PST_DWARF_PARAMETER_H__
+#define __PST_DWARF_PARAMETER_H__
 
 #include <inttypes.h>
 #include <elfutils/libdwfl.h>
 
-#include "../src/dwarf/dwarf_expression.h"
-#include "../utils/list_head.h"
+#include "dwarf_expression.h"
+#include "utils/list_head.h"
 #include "context.h"
 
 typedef struct __pst_type {
@@ -56,4 +56,4 @@ bool pst_parameter_print_dwarf(pst_parameter* param);
 bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base);
 pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, int type);
 
-#endif /* SRC_DWARF_DWARF_PARAMETER_H_ */
+#endif /* __PST_DWARF_PARAMETER_H__ */

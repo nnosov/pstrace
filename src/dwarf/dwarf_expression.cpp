@@ -5,13 +5,13 @@
  *      Author: nnosov
  */
 
-#include "../src/dwarf/dwarf_expression.h"
 
 #include <stdarg.h>
 
-#include "../utils/allocator.h"
+#include "utils/allocator.h"
 #include "common.h"
 #include "context.h"
+#include "dwarf_expression.h"
 
 //
 // DWARF operation

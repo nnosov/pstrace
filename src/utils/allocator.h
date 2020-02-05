@@ -5,8 +5,8 @@
  *      Author: nnosov
  */
 
-#ifndef PST_ALLOCATOR_H_
-#define PST_ALLOCATOR_H_
+#ifndef __PST_ALLOCATOR_H__
+#define __PST_ALLOCATOR_H__
 
 #include <stdint.h>
 #include <assert.h>
@@ -56,4 +56,4 @@ void pst_alloc_init(pst_allocator* alloc);
 void pst_alloc_init_custom(pst_allocator* alloc, void* buff, uint32_t size);
 void pst_alloc_fini(pst_allocator* alloc);
 
-#endif /* PST_ALLOCATOR_H_ */
+#endif /* __PST_ALLOCATOR_H__ */

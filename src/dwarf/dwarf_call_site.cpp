@@ -5,15 +5,15 @@
  *      Author: nnosov
  */
 
-#include "../src/dwarf/dwarf_call_site.h"
 
 #include <dwarf.h>
 #include <elfutils/libdw.h>
 
-#include "../src/dwarf/dwarf_function.h"
-#include "../src/dwarf/dwarf_utils.h"
-#include "../src/dwarf/dwarf_utils.h"
-#include "../utils/hash_multimap.h"
+#include "dwarf_call_site.h"
+#include "dwarf_function.h"
+#include "dwarf_utils.h"
+#include "dwarf_utils.h"
+#include "utils/hash_multimap.h"
 
 // -----------------------------------------------------------------------------------
 // pst_call_site_param
