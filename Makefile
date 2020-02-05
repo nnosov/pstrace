@@ -43,19 +43,16 @@ BIN  			= $(RESULT_DIR)/trace
 #	)
 
 #source file search path. add here new directories which contains files specified for $(SRC)
-VPATH = ./
+VPATH = ./tests
 
 SRC 		= $(shell find . -name '*.cpp')
 #OBJ 		= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 OBJ 		= $(BUILD_DIR)/main.o
 
-LIBS 		= -L./ -lpthread -luuid -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++
-ATR_LIBS	= ./build/libframework.a
+LIBS 		= -L./ -lpthread -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++
+PST_LIBS	= ./build/libpst.a
 
-INCS		= -I./ \
--I/usr/include/postgresql -I /usr/include/libxml2 -I./thirdparty -I/opt/swifttest/include  -I/usr/include/GraphicsMagick \
--I./framework -I./framework/swi -I./framework/utils -I./framework/rmq -I./framework/logger -I$(BUILD_DIR)
-#FLAGS		= -Wall -gdwarf-4 -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -std=c++11
+INCS		= -I./include -I./src
 FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
 
 
@@ -63,12 +60,12 @@ FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_M
 
 all: $(BIN)
 
-$(ATR_LIBS):
-	@make -C ./framework
+$(PST_LIBS):
+	@make -C ./src
 
 clean:
 	${RM} $(BUILD_DIR)/*.o $(BUILD_DIR)/*.dep $(BIN) $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(BUILD_DIR)/version.h
-	@make clean -C ./framework
+	@make clean -C ./src
 	@if [ -z "$$(ls -A $(BUILD_DIR) 2>&1)" ]; then ${RM} -r $(BUILD_DIR); fi
 	@if [ -z "$$(ls -A $(RESULT_DIR) 2>&1)" ]; then ${RM} -r $(RESULT_DIR); fi
 
@@ -80,11 +77,11 @@ $(RESULT_DIR)/prepare.res:
 	@if [ ! -e $(RESULT_DIR) ]; then mkdir -vp $(RESULT_DIR); fi
 	@touch $@
 
-$(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(ATR_LIBS)
-	gcc -ggdb -O3 -o $(BUILD_DIR)/simple simple.cpp
-	@make -C ./framework
+$(BIN): $(BUILD_DIR)/prepare.bld $(RESULT_DIR)/prepare.res $(OBJ) $(PST_LIBS)
+	gcc -ggdb -O3 -o $(BUILD_DIR)/simple ./tests/simple.cpp
+	@make -C ./src
 	@printf "Create   %-60s" $@
-	@OUT=$$($(CXX) $(COLOR) -o $@ $(OBJ) $(ATR_LIBS) $(LIBS) 2>&1); \
+	@OUT=$$($(CXX) $(COLOR) -o $@ $(OBJ) $(PST_LIBS) $(LIBS) 2>&1); \
 	if [ $$? -ne "0" ]; \
 	  then echo -e "${RED}[FAILED]${NC}"; echo -e "$$OUT"; \
 	else \
