@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "allocator.h"
-#include "common.h"
 
 void heap_free(pst_allocator* alloc, void* buff)
 {

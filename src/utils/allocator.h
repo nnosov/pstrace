@@ -16,15 +16,15 @@
 #define CAT(a, ...) CAT2(a, __VA_ARGS__)
 #define CAT2(a, ...) a ## __VA_ARGS__
 
-// declaration with initialization and parameters of initialization
+// declaration and initialization with parameters
 #define pst_decl(TYPE, NAME, ...) \
     TYPE NAME; CAT2(TYPE, _init) (&NAME, __VA_ARGS__);
 
-// declaration with initialization
+// declaration and initialization without parameters
 #define pst_decl0(TYPE, NAME) \
     TYPE NAME; CAT2(TYPE, _init) (&NAME);
 
-// allocation with initialization
+// allocation and initialization with parameters
 #define pst_new(TYPE, NAME, ...) \
     TYPE* NAME; NAME = CAT2(TYPE, _new) (__VA_ARGS__);
 
