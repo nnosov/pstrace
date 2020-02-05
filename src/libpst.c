@@ -12,8 +12,8 @@
 #include "utils/allocator.h"
 #include "dwarf/dwarf_handler.h"
 
-// allocate and initialize libpst handler.
-pst_handler* pst_new_handler(ucontext_t* hctx)
+// allocate and initialize libpst library
+pst_handler* pst_lib_init(ucontext_t* hctx)
 {
     // global
     pst_alloc_init(&allocator);
@@ -23,8 +23,8 @@ pst_handler* pst_new_handler(ucontext_t* hctx)
     return handler;
 }
 
-// deallocate libpst handler
-void pst_del_handler(pst_handler* h)
+// deallocate libpst handler and library
+void pst_lib_fini(pst_handler* h)
 {
     pst_free(h);
 

@@ -17,11 +17,11 @@
 
 typedef struct pst_handler pst_handler;
 
-// allocate and initialize libpst handler.
-pst_handler* pst_new_handler(ucontext_t* hctx);
+// allocate libpst handler and initialize the library
+pst_handler* pst_lib_init(ucontext_t* hctx);
 
-// deallocate libpst handler
-void pst_del_handler(pst_handler* h);
+// deallocate libpst handler and deinitialize the library
+void pst_lib_fini(pst_handler* h);
 
 
 //
@@ -35,10 +35,9 @@ int pst_unwind_simple_fd(pst_handler* h, FILE* fd);
 // save stack trace information to provided buffer in RAM
 int pst_unwind_simple(pst_handler* h, char* buff, uint32_t buff_size);
 
-
+//
 // Advanced unwind routines.
-// Unwinds current stack trace using DWARF debug sections in file if they present and print it to provided file descriptor.
-// Additionally to pst_unwind_simple(...) provides types of parameters and variables in functions and their values
+// Additionally to pst_unwind_simple(...) provides types of parameters and variables in functions and their values if possible
 //
 
 // write stack trace information to provided file descriptor

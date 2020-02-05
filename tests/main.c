@@ -62,7 +62,7 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     printf("%s signal handled\n", strsignal(sig));
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    pst_handler* handler = pst_new_handler((ucontext_t*)context);
+	    pst_handler* handler = pst_lib_init((ucontext_t*)context);
 	    if(!handler) {
 	        printf("Failed to allocate pst handler\n");
 	        return;
@@ -75,7 +75,7 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 	        printf("No stack trace obtained\n");
 	    }
 
-	    pst_del_handler(handler);
+	    pst_lib_fini(handler);
     }
 
 
