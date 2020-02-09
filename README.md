@@ -9,19 +9,19 @@
 
 * [Useful links](#useful-links)
 
-The goal of the project is to enable C/C++ developers to get informative  stack trace in case of program crash (inside of signal handler). Key feature is to log not only function address/name/line etc but (if DWARF .debug_info section is present) values of function's parameters and variables.
+The goal of the project is to enable C/C++ (and in future other languages) developers to get informative  stack trace in case of program crash, for example inside of segmentation fault handler. The key feature is to log not only function address/name/line but additionally (if DWARF `.debug_info` section is present) values of function's parameters and variables.
 
-Currently development focused on x86_64 architecture and for Linux OS, but further may be expanded to other architectures and OS if it will be demanded and some people will like to contribute to the project to support this architecture and OS.
+Currently development is focused on `x86_64` architecture and for Linux OS, but further may be expanded to other architectures and OS if it will be demanded and some people will like to contribute to the project to support this architecture and OS.
 
 As a first stage the goal is to dump only C/C++ base types such as pointer, boolean, integer etc.
 
-Second stage dump composite types such as C structures, C++ classes, arrays etc.
+Second stage is to dump composite types such as a C structures, arrays, C++ classes, etc.
 
-Third stage to dump dereferenced pointers to data types with pointer validation.
+Third stage is to dump dereferenced pointers to data types with pointer validation.
 
 ## Dependencies
 
-Currently library mostly depends on libunwind library which used to unwind function's stack frames from stack in signal handler, and libdw library which gives access to DWARF information of executed process if it present.
+Currently library mostly depends on `libunwind` library which used to unwind function's stack frames from stack in signal handler, `libdw` library which gives access to DWARF information of executed process if it present and `libiberty` which provides demangling of function names for C++ and other languages.
 
 ## commands to work with debug information
 
