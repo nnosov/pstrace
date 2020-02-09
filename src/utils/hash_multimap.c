@@ -11,7 +11,7 @@
  * http://nsoft.volgocity.ru/cdl or
  * http://cdl.sourceforge.net
  * ===========================================================================*/
-#include "../src/utils/hash_multimap.h"
+#include "hash_multimap.h"
 
 #include <string.h>
 #include <stdlib.h>
