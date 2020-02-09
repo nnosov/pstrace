@@ -49,7 +49,7 @@ SRC 		= $(shell find . -name '*.c')
 #OBJ 		= $(patsubst %.cpp,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 OBJ 		= $(BUILD_DIR)/main.o
 
-LIBS 		= -L./ -lpthread -ldl -ldw -lunwind -lunwind-x86_64 -lstdc++ -liberty
+LIBS 		= -L./ -lpthread -ldl -ldw -lunwind -lunwind-x86_64 -liberty
 LIB_STATIC	= $(RESULT_DIR)/libpst.a
 LIB_DYNAMIC	= $(RESULT_DIR)/libpst.so
 
