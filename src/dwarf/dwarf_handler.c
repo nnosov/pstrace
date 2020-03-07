@@ -188,17 +188,17 @@ bool pst_handler_unwind(pst_handler* h)
     h->ctx.sp = h->ctx.hcontext->uc_mcontext.gregs[REG_RSP];
     pst_log(SEVERITY_DEBUG, "Original caller's SP: %#lX", h->ctx.sp);
 #elif defined(REG_EIP) // x86_32
-    caller_address = (void *) uctx->uc_mcontext.gregs[REG_EIP]);
+    caller = (void *) uctx->uc_mcontext.gregs[REG_EIP]);
 #elif defined(__arm__)
-    caller_address = (void *) uctx->uc_mcontext.arm_pc);
+    caller = (void *) uctx->uc_mcontext.arm_pc);
 #elif defined(__aarch64__)
-    caller_address = (void *) uctx->uc_mcontext.pc);
+    caller = (void *) uctx->uc_mcontext.pc);
 #elif defined(__ppc__) || defined(__powerpc) || defined(__powerpc__) || defined(__POWERPC__)
-    caller_address = (void *) uctx->uc_mcontext.regs->nip);
+    caller = (void *) uctx->uc_mcontext.regs->nip);
 #elif defined(__s390x__)
-    caller_address = (void *) uctx->uc_mcontext.psw.addr);
+    caller = (void *) uctx->uc_mcontext.psw.addr);
 #elif defined(__APPLE__) && defined(__x86_64__)
-    caller_address = (void *) uctx->uc_mcontext->__ss.__rip);
+    caller = (void *) uctx->uc_mcontext->__ss.__rip);
 #else
 #   error "unknown architecture!"
 #endif
@@ -209,55 +209,52 @@ bool pst_handler_unwind(pst_handler* h)
 	h->ctx.base_addr = (uint64_t)info.dli_fbase;
 	pst_log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
 
-	h->ctx.dwfl = dwfl_begin(&callbacks);
-    if(h->ctx.dwfl == NULL) {
-        h->ctx.print(&h->ctx, "Failed to initialize libdw session for parse stack frames");
-        return false;
-    }
+	if(!h->ctx.dwfl) {
+	    h->ctx.dwfl = dwfl_begin(&callbacks);
+	    if(h->ctx.dwfl == NULL) {
+	        h->ctx.print(&h->ctx, "Failed to initialize libdw session for parse stack frames");
+	        return false;
+	    }
 
-    if(dwfl_linux_proc_report(h->ctx.dwfl, getpid()) != 0 || dwfl_report_end(h->ctx.dwfl, NULL, NULL) !=0) {
-        h->ctx.print(&h->ctx, "Failed to parse debug section of executable");
-    	return false;
-    }
-
+	    if(dwfl_linux_proc_report(h->ctx.dwfl, getpid()) != 0 || dwfl_report_end(h->ctx.dwfl, NULL, NULL) !=0) {
+	        h->ctx.print(&h->ctx, "Failed to parse debug section of executable");
+	        dwfl_end(h->ctx.dwfl);
+	        h->ctx.dwfl = NULL;
+	        return false;
+	    }
+	}
     h->ctx.print(&h->ctx, "Stack trace: caller = %p\n", caller);
 
     unw_getcontext(&h->ctx.context);
     unw_init_local(&h->ctx.cursor, &h->ctx.context);
-    h->ctx.curr_frame = &h->ctx.cursor;
-
-    Dwarf_Addr addr; // address of currently processed function
-    for(int i = 0, skip = 1; unw_step(h->ctx.curr_frame) > 0; ++i) {
-        if(unw_get_reg(h->ctx.curr_frame, UNW_REG_IP,  &addr)) {
+    for(int i = 0, skip = 1; unw_step(&h->ctx.cursor) > 0; ++i) {
+        Dwarf_Addr pc, sp;
+        if(unw_get_reg(&h->ctx.cursor, UNW_REG_IP,  &pc)) {
             pst_log(SEVERITY_DEBUG, "Failed to get IP value");
             continue;
         }
-        unw_word_t  sp;
-        if(unw_get_reg(h->ctx.curr_frame, UNW_REG_SP,  &sp)) {
+
+        if(unw_get_reg(&h->ctx.cursor, UNW_REG_SP,  &sp)) {
             pst_log(SEVERITY_DEBUG, "Failed to get SP value");
             continue;
         }
 
-        if(addr == (uint64_t)caller) {
+        if(pc == (uint64_t)caller) {
             skip = 0;
         } else if(skip) {
-            pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
+            pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
             continue;
         }
 
         h->ctx.print(&h->ctx, "[%-2d] ", i);
-        h->ctx.module = dwfl_addrmodule(h->ctx.dwfl, addr);
+        pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
         pst_function* last = last_function(h);
         pst_function* fn = add_function(h, NULL);
-        fn->sp = sp;
-        pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, addr, sp);
-        if(!pst_function_unwind(fn, addr)) {
+        fn->pc = pc; fn->sp = sp;
+        if(!pst_function_unwind(fn)) {
             del_function(fn);
-        } else {
-            if(last) {
-                last->parent = fn;
-            }
-            //get_frame(fun);
+        } else if(last) {
+            last->parent = fn;
         }
         h->ctx.print(&h->ctx, "\n");
     }

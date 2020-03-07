@@ -59,7 +59,7 @@ typedef union {
 } pst_sized_value;
 
 typedef struct __pst_dwarf_value {
-    list_node            node;       // uplink, !!! must be 1st field in structure !!!
+    list_node            node;       // uplink
 
     // fields
     pst_sized_value     value;      // value itself

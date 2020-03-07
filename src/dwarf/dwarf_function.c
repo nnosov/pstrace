@@ -375,34 +375,31 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
     return true;
 }
 
-bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr)
+bool pst_function_unwind(pst_function* fn)
 {
-    fn->pc = addr;
-
-    Dwfl_Line *dwline = dwfl_getsrc(fn->ctx->dwfl, addr);
+    Dwfl_Line *dwline = dwfl_getsrc(fn->ctx->dwfl, fn->pc);
     if(dwline != NULL) {
-        Dwarf_Addr addr;
-        const char* filename = dwfl_lineinfo (dwline, &addr, &fn->line, NULL, NULL, NULL);
+        const char* filename = dwfl_lineinfo (dwline, &fn->pc, &fn->line, NULL, NULL, NULL);
         if(filename) {
-            const char* str = strrchr(filename, '/');
-            if(str && *str != 0) {
-                str++;
+            const char* file = strrchr(filename, '/');
+            if(file && *file != 0) {
+                file++;
             } else {
-                str = filename;
+                file = filename;
             }
-            fn->file = pst_strdup(str);
-            fn->ctx->print(fn->ctx, "%s:%d", str, fn->line);
+            fn->file = pst_strdup(file);
+            fn->ctx->print(fn->ctx, "%s:%d", fn->file, fn->line);
         } else {
-            fn->ctx->print(fn->ctx, "%p", (void*)addr);
+            fn->ctx->print(fn->ctx, "%p", (void*)fn->pc);
         }
     } else {
-        fn->ctx->print(fn->ctx, "%p", (void*)addr);
+        fn->ctx->print(fn->ctx, "%p", (void*)fn->pc);
     }
 
-    const char* addrname = dwfl_module_addrname(fn->ctx->module, addr);
-    char* demangle_name = NULL;
+    Dwfl_Module* module = dwfl_addrmodule(fn->ctx->dwfl, fn->pc);
+    const char* addrname = dwfl_module_addrname(module, fn->pc);
     if(addrname) {
-        demangle_name = cplus_demangle(addrname, 0);
+        char* demangle_name = cplus_demangle(addrname, 0);
         char* function_name = NULL;
         if(asprintf(&function_name, "%s%s", demangle_name ? demangle_name : addrname, demangle_name ? "" : "()") == -1) {
             pst_log(SEVERITY_ERROR, "Failed to allocate memory");
@@ -416,10 +413,10 @@ bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr)
         }
         fn->name = pst_strdup(function_name);
         free(function_name);
-    }
 
-    if(demangle_name) {
-        free(demangle_name);
+        if(demangle_name) {
+            free(demangle_name);
+        }
     }
 
     return true;
@@ -440,7 +437,7 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
 
     fn->sp = 0;
     fn->cfa = 0;
-    memcpy(&fn->cursor, _ctx->curr_frame, sizeof(fn->cursor));
+    memcpy(&fn->cursor, &_ctx->cursor, sizeof(fn->cursor));
     fn->line = -1;
     fn->file = NULL;
     fn->parent = _parent;

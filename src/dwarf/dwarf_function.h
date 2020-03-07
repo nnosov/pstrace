@@ -45,7 +45,7 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
 pst_function* pst_function_new(pst_context* _ctx, pst_function* _parent);
 void pst_function_fini(pst_function* fn);
 
-bool pst_function_unwind(pst_function* fn, Dwarf_Addr addr);
+bool pst_function_unwind(pst_function* fn);
 bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d);
 bool pst_function_print_dwarf(pst_function* fn);
 
