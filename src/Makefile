@@ -37,7 +37,7 @@ VPATH 		= ./ ./dwarf ./arch ./utils
 SRC			= $(wildcard $(addsuffix /*.c,${VPATH}))
 OBJ			= $(patsubst %.c,%.o,$(addprefix $(BUILD_DIR)/,$(notdir $(SRC))))
 
-INCS		= -I"./dwarf" -I"./" -I"./utils" -I"./arch"
+INCS		= -I"./dwarf" -I"./" -I"./utils" -I"./arch" -I"../include"
 FLAGS		= -Wall -ggdb -fPIC -O3 -rdynamic -D_GNU_SOURCE -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -DSOFT_BUILD=$(SOFT_BUILD) -DUSER_BUILD=$(USER) -DDATE_BUILD="$(DATE_BUILD)"
 
 .PHONY: all clean

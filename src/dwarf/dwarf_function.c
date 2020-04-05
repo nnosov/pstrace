@@ -34,7 +34,7 @@ static bool get_frame(pst_function* fn)
     }
 
     // get frame of CFI for address
-    int result = dwarf_cfi_addrframe (cfi, fn->pc - mod_bias, &fn->frame);
+    int result = dwarf_cfi_addrframe (cfi, fn->info.pc - mod_bias, &fn->frame);
     if (result != 0) {
         pst_log(SEVERITY_ERROR, "Failed to find CFI frame for module");
         return false;
@@ -44,8 +44,8 @@ static bool get_frame(pst_function* fn)
     fn->ctx->frame = fn->frame;
 
     // get return register and PC range for function
-    Dwarf_Addr start = fn->pc;
-    Dwarf_Addr end = fn->pc;
+    Dwarf_Addr start = fn->info.pc;
+    Dwarf_Addr end = fn->info.pc;
     bool signalp;
     int ra_regno = dwarf_frame_info (fn->frame, &start, &end, &signalp);
     if(ra_regno >= 0) {
@@ -54,7 +54,7 @@ static bool get_frame(pst_function* fn)
         reginfo info; info.regno = ra_regno;
         dwfl_module_register_names(fn->ctx->module, regname_callback, &info);
         pst_log(SEVERITY_INFO, "Function %s(...): '.eh/debug frame' info: PC range:  => [%#" PRIx64 ", %#" PRIx64 "], return register: %s, in_signal = %s",
-                fn->name, start, end, info.regname, signalp ? "true" : "false");
+                fn->info.name, start, end, info.regname, signalp ? "true" : "false");
     } else {
         pst_log(SEVERITY_WARNING, "Return address register info unavailable (%s)", dwarf_errmsg(0));
     }
@@ -75,7 +75,7 @@ static bool get_frame(pst_function* fn)
     bool nret = true;
     pst_decl(pst_dwarf_stack, stack, fn->ctx);
     if(pst_dwarf_stack_calc(&stack, cfa_ops, cfa_nops, NULL, NULL) && pst_dwarf_stack_get_value(&stack, &fn->cfa)) {
-        pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->name, fn->ctx->buff, fn->cfa);
+        pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->info.name, fn->ctx->buff, fn->cfa);
 
         // setup context to match CFA for frame
         fn->ctx->cfa = fn->cfa;
@@ -115,7 +115,7 @@ static void clear(pst_function* fn)
     pst_call_site_storage_fini(&fn->call_sites);
 }
 
-static pst_parameter* next_param(pst_function* fn, pst_parameter* p)
+pst_parameter* pst_function_next_parameter(pst_function* fn, pst_parameter* p)
 {
     struct list_node* n = (p == NULL) ? list_first(&fn->params) : list_next(&p->node);
 
@@ -191,41 +191,41 @@ bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
 bool pst_function_print_dwarf(pst_function* fn)
 {
     char* at = NULL;
-    if(fn->file) {
-        if(!asprintf(&at, " at %s:%d, %p", fn->file, fn->line, (void*)fn->pc))
+    if(fn->info.file) {
+        if(!asprintf(&at, " at %s:%d, %p", fn->info.file, fn->info.line, (void*)fn->info.pc))
             return false;
-    } else if(!asprintf(&at, " at %p", (void*)fn->pc)){
+    } else if(!asprintf(&at, " at %p", (void*)fn->info.pc)){
         return false;
     }
 
     // handle return parameter and be safe if function haven't parameters (for example, dwar info for function is absent)
-    pst_parameter* param = next_param(fn, NULL);
-    if(param && param->is_return) {
+    pst_parameter* param = pst_function_next_parameter(fn, NULL);
+    if(param && param->info.is_return) {
         // print return value type, function name and start list of parameters
         pst_parameter_print_dwarf(param);
-        fn->ctx->print(fn->ctx, " %s(", fn->name);
-        param = next_param(fn, param);
+        fn->ctx->print(fn->ctx, " %s(", fn->info.name);
+        param = pst_function_next_parameter(fn, param);
     } else {
-        fn->ctx->print(fn->ctx, "%s(", fn->name);
+        fn->ctx->print(fn->ctx, "%s(", fn->info.name);
     }
 
     bool first = true; bool start_variable = false;
-    for(; param; param = next_param(fn, param)) {
-        if(param->is_return) {
+    for(; param; param = pst_function_next_parameter(fn, param)) {
+        if(param->info.is_return) {
             // print return value type, function name and start list of parameters
             pst_parameter_print_dwarf(param);
-            fn->ctx->print(fn->ctx, " %s(", fn->name);
+            fn->ctx->print(fn->ctx, " %s(", fn->info.name);
             continue;
         }
 
-        if(param->is_variable) {
+        if(param->info.is_variable) {
             if(!start_variable) {
                 fn->ctx->print(fn->ctx, ")%s\n", at);
                 fn->ctx->print(fn->ctx, "{\n");
                 start_variable = true;
             }
-            if(param->line) {
-                fn->ctx->print(fn->ctx, "%04u:   ", param->line);
+            if(param->info.line) {
+                fn->ctx->print(fn->ctx, "%04u:   ", param->info.line);
             } else {
                 fn->ctx->print(fn->ctx, "        ");
             }
@@ -273,7 +273,7 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
     fn->ctx->clean_print(fn->ctx);
 
     pst_log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
-            dwarf_diename(d), fn->lowpc, fn->highpc, fn->pc - fn->ctx->base_addr, info.start_ip, info.start_ip - fn->ctx->base_addr);
+            dwarf_diename(d), fn->lowpc, fn->highpc, fn->info.pc - fn->ctx->base_addr, info.start_ip, info.start_ip - fn->ctx->base_addr);
     fn->ctx->print_registers(fn->ctx, 0x0, 0x10);
     pst_log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), fn->parent ? fn->parent->sp : 0, fn->ctx->buff);
     pst_log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), fn->ctx->buff);
@@ -306,11 +306,11 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 
     // Get reference to return attribute type of the function
     // may be to use dwfl_module_return_value_location() instead
-    pst_parameter* ret_p = add_param(fn); ret_p->is_return = true;
+    pst_parameter* ret_p = add_param(fn); ret_p->info.is_return = true;
     attr = dwarf_attr(fn->die, DW_AT_type, &attr_mem);
     if(attr) {
         if(!pst_parameter_handle_type(ret_p, attr)) {
-            pst_log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", fn->name);
+            pst_log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", fn->info.name);
             del_param(ret_p);
         }
     } else {
@@ -375,9 +375,9 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 
 bool pst_function_unwind(pst_function* fn)
 {
-    Dwfl_Line *dwline = dwfl_getsrc(fn->ctx->dwfl, fn->pc);
+    Dwfl_Line *dwline = dwfl_getsrc(fn->ctx->dwfl, fn->info.pc);
     if(dwline != NULL) {
-        const char* filename = dwfl_lineinfo (dwline, &fn->pc, &fn->line, NULL, NULL, NULL);
+        const char* filename = dwfl_lineinfo (dwline, &fn->info.pc, &fn->info.line, NULL, NULL, NULL);
         if(filename) {
             const char* file = strrchr(filename, '/');
             if(file && *file != 0) {
@@ -385,12 +385,12 @@ bool pst_function_unwind(pst_function* fn)
             } else {
                 file = filename;
             }
-            fn->file = pst_strdup(file);
+            fn->info.file = pst_strdup(file);
         }
     }
 
-    Dwfl_Module* module = dwfl_addrmodule(fn->ctx->dwfl, fn->pc);
-    const char* addrname = dwfl_module_addrname(module, fn->pc);
+    Dwfl_Module* module = dwfl_addrmodule(fn->ctx->dwfl, fn->info.pc);
+    const char* addrname = dwfl_module_addrname(module, fn->info.pc);
     if(addrname) {
         char* demangle_name = cplus_demangle(addrname, 0);
         char* function_name = NULL;
@@ -403,7 +403,7 @@ bool pst_function_unwind(pst_function* fn)
         if(str) {
             *str = 0;
         }
-        fn->name = pst_strdup(function_name);
+        fn->info.name = pst_strdup(function_name);
         free(function_name);
 
         if(demangle_name) {
@@ -421,17 +421,17 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
     // fields
     fn->lowpc = 0;
     fn->highpc = 0;
-    fn->pc = 0;
+    fn->info.pc = 0;
+    fn->info.name = NULL;
+    fn->info.line = -1;
+    fn->info.file = NULL;
     fn->die = NULL;
-    fn->name = NULL;
     list_head_init(&fn->params);
     pst_call_site_storage_init(&fn->call_sites, _ctx);
 
     fn->sp = 0;
     fn->cfa = 0;
     memcpy(&fn->cursor, &_ctx->cursor, sizeof(fn->cursor));
-    fn->line = -1;
-    fn->file = NULL;
     fn->parent = _parent;
     fn->frame = NULL;
     fn->ctx = _ctx;
@@ -458,12 +458,12 @@ void pst_function_fini(pst_function* fn)
         free(fn->frame);
     }
 
-    if(fn->name) {
-        pst_free(fn->name);
+    if(fn->info.name) {
+        pst_free(fn->info.name);
     }
 
-    if(fn->file) {
-        pst_free(fn->file);
+    if(fn->info.file) {
+        pst_free(fn->info.file);
     }
 
     if(fn->allocated) {

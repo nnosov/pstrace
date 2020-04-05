@@ -42,11 +42,11 @@ bool get_dwarf_function(pst_handler* h, pst_function* fun)
 {
     Dwarf_Addr mod_cu = 0;
     // get CU(Compilation Unit) debug definition
-    h->ctx.module = dwfl_addrmodule(h->ctx.dwfl, fun->pc);
-    Dwarf_Die* cdie = dwfl_module_addrdie(h->ctx.module, fun->pc, &mod_cu);
+    h->ctx.module = dwfl_addrmodule(h->ctx.dwfl, fun->info.pc);
+    Dwarf_Die* cdie = dwfl_module_addrdie(h->ctx.module, fun->info.pc, &mod_cu);
     //Dwarf_Die* cdie = dwfl_addrdie(dwfl, addr, &mod_bias);
     if(!cdie) {
-        pst_log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", fun->pc);
+        pst_log(SEVERITY_INFO, "Failed to find DWARF DIE for address %X", fun->info.pc);
     	return false;
     }
 
@@ -67,7 +67,7 @@ bool get_dwarf_function(pst_handler* h, pst_function* fun)
 		int tag = dwarf_tag(&result);
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
 		    //ctx.log(SEVERITY_DEBUG, "function die name %s", dwarf_diename(&result));
-			if(!strcmp(fun->name, dwarf_diename(&result))) {
+			if(!strcmp(fun->info.name, dwarf_diename(&result))) {
 				return pst_function_handle_dwarf(fun, &result);
 			}
 		}
@@ -100,7 +100,7 @@ static void clear(pst_handler* h)
     }
 }
 
-static pst_function* next_function(pst_handler* h, pst_function* fn)
+pst_function* pst_handler_next_function(pst_handler* h, pst_function* fn)
 {
     list_node* n = (fn == NULL) ? list_first(&h->functions) : list_next(&fn->node);
     pst_function* ret = NULL;
@@ -139,11 +139,11 @@ bool pst_handler_handle_dwarf(pst_handler* h)
 
     //for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
     for(pst_function* fun = last_function(h); fun; fun = prev_function(h, fun)) {
-        dladdr((void*)(fun->pc), &info);
-        pst_log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
+        dladdr((void*)(fun->info.pc), &info);
+        pst_log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->info.name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
 
         // setup context
-        h->ctx.module       = dwfl_addrmodule(h->ctx.dwfl, fun->pc);
+        h->ctx.module       = dwfl_addrmodule(h->ctx.dwfl, fun->info.pc);
         h->ctx.base_addr    = (uint64_t)info.dli_fbase;
         h->ctx.curr_frame   = &fun->cursor;
         h->ctx.sp           = fun->sp;
@@ -161,7 +161,7 @@ const char* pst_print_pretty(pst_handler* h)
     h->ctx.clean_print(&h->ctx);
     h->ctx.print(&h->ctx, "DWARF-based stack trace information:\n");
     uint32_t idx = 0;
-    for(pst_function* fn = next_function(h, NULL); fn; fn = next_function(h, fn)) {
+    for(pst_function* fn = pst_handler_next_function(h, NULL); fn; fn = pst_handler_next_function(h, fn)) {
         h->ctx.print(&h->ctx, "[%-2u] ", idx); idx++;
         pst_function_print_dwarf(fn);
         h->ctx.print(&h->ctx, "\n");
@@ -184,13 +184,13 @@ const char* pst_print_simple(pst_handler* h)
     h->ctx.clean_print(&h->ctx);
     h->ctx.print(&h->ctx, "Simple unwind-based stack trace:\n");
     uint32_t idx = 0;
-    for(pst_function* fn = next_function(h, NULL); fn; fn = next_function(h, fn)) {
+    for(pst_function* fn = pst_handler_next_function(h, NULL); fn; fn = pst_handler_next_function(h, fn)) {
         h->ctx.print(&h->ctx, "[%-2d] ", idx);
-        h->ctx.print(fn->ctx, "%s() ", fn->name);
-        if(fn->file) {
-            h->ctx.print(fn->ctx, "at %s:%d, %p", fn->file, fn->line, (void*)fn->pc);
+        h->ctx.print(fn->ctx, "%s() ", fn->info.name);
+        if(fn->info.file) {
+            h->ctx.print(fn->ctx, "at %s:%d, %p", fn->info.file, fn->info.line, (void*)fn->info.pc);
         } else {
-            h->ctx.print(fn->ctx, "at %p", (void*)fn->pc);
+            h->ctx.print(fn->ctx, "at %p", (void*)fn->info.pc);
         }
         h->ctx.print(&h->ctx, "\n");
         idx++;
@@ -276,7 +276,7 @@ bool pst_handler_unwind(pst_handler* h)
         pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
         pst_function* last = last_function(h);
         pst_function* fn = add_function(h, NULL);
-        fn->pc = pc; fn->sp = sp;
+        fn->info.pc = pc; fn->sp = sp;
         if(!pst_function_unwind(fn)) {
             del_function(fn);
         } else if(last) {

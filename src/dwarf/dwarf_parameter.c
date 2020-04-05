@@ -70,20 +70,20 @@ static pst_type* next_type(pst_parameter* param, pst_type* t)
 bool pst_parameter_print_dwarf(pst_parameter* param)
 {
     if(list_count(&param->types)) {
-        if(!param->is_return) {
-            if(param->has_value) {
-                param->ctx->print(param->ctx, "%s %s = 0x%lX", next_type(param, NULL)->name, param->name, param->location.value);
+        if(!param->info.is_return) {
+            if(param->info.has_value) {
+                param->ctx->print(param->ctx, "%s %s = 0x%lX", next_type(param, NULL)->name, param->info.name, param->info.value);
             } else {
-                param->ctx->print(param->ctx, "%s %s = <undefined>", next_type(param, NULL)->name, param->name);
+                param->ctx->print(param->ctx, "%s %s = <undefined>", next_type(param, NULL)->name, param->info.name);
             }
         } else {
             param->ctx->print(param->ctx, "%s", next_type(param, NULL)->name);
         }
     } else {
-        if(param->has_value) {
-            param->ctx->print(param->ctx, "%s = 0x%lX", param->name, param->location.value);
+        if(param->info.has_value) {
+            param->ctx->print(param->ctx, "%s = 0x%lX", param->info.name, param->info.value);
         } else {
-            param->ctx->print(param->ctx, "%s = <undefined>", param->name);
+            param->ctx->print(param->ctx, "%s = <undefined>", param->info.name);
         }
     }
     return true;
@@ -113,12 +113,12 @@ bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base)
     switch (dwarf_tag(&ret_die)) {
         case DW_TAG_base_type: {
             // get Size attribute and it's value
-            param->size = 0;
+            param->info.size = 0;
             attr = dwarf_attr(&ret_die, DW_AT_byte_size, &attr_mem);
             if(attr) {
-                dwarf_formudata(attr, &param->size);
+                dwarf_formudata(attr, &param->info.size);
             }
-            pst_log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), param->size);
+            pst_log(SEVERITY_DEBUG, "base type '%s'(%lu)", dwarf_diename(&ret_die), param->info.size);
             pst_parameter_add_type(param, dwarf_diename(&ret_die), DW_TAG_base_type);
             param->type = DW_TAG_base_type;
 
@@ -184,13 +184,13 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
     Dwarf_Attribute attr_mem;
     Dwarf_Attribute* attr;
 
-    param->name = pst_strdup(dwarf_diename(result));
-    param->is_variable = (dwarf_tag(result) == DW_TAG_variable);
+    param->info.name = pst_strdup(dwarf_diename(result));
+    param->info.is_variable = (dwarf_tag(result) == DW_TAG_variable);
 
-    dwarf_decl_line(result, (int*)&param->line);
+    dwarf_decl_line(result, (int*)&param->info.line);
     // Get reference to attribute type of the parameter/variable
     attr = dwarf_attr(result, DW_AT_type, &attr_mem);
-    pst_log(SEVERITY_DEBUG, "---> Handle '%s' %s", param->name, dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
+    pst_log(SEVERITY_DEBUG, "---> Handle '%s' %s", param->info.name, dwarf_tag(result) == DW_TAG_formal_parameter ? "parameter" : "variable");
     if(attr) {
         pst_parameter_handle_type(param, attr);
     }
@@ -202,7 +202,8 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
         unw_get_reg(param->ctx->curr_frame, UNW_REG_IP,  &pc);
 
         if(handle_location(param->ctx, attr, &param->location, pc, fun)) {
-            param->has_value = true;
+            param->info.value = param->location.value;
+            param->info.has_value = true;
         } else {
             pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", param->ctx->buff);
         }
@@ -218,20 +219,20 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
             case DW_FORM_data2:
             case DW_FORM_data4:
             case DW_FORM_data8:
-                dwarf_formudata(attr, &param->location.value);
-                param->has_value = true;
+                dwarf_formudata(attr, &param->info.value);
+                param->info.has_value = true;
                 break;
             case DW_FORM_sdata:
-                dwarf_formsdata(attr, (int64_t*)&param->location.value);
-                param->has_value = true;
+                dwarf_formsdata(attr, (int64_t*)&param->info.value);
+                param->info.has_value = true;
                 break;
             case DW_FORM_udata:
-                dwarf_formudata(attr, &param->location.value);
-                param->has_value = true;
+                dwarf_formudata(attr, &param->info.value);
+                param->info.has_value = true;
                 break;
         }
-        if(param->has_value) {
-            pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->location.value);
+        if(param->info.has_value) {
+            pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->info.value);
         }
     }
 
@@ -260,15 +261,17 @@ void pst_parameter_init(pst_parameter* param, pst_context* ctx)
 {
     list_node_init(&param->node);
     param->die = NULL;
-    param->name = NULL;
-    param->line = 0;
-    param->size = 0;
+    // info field
+    param->info.name = NULL;
+    param->info.line = 0;
+    param->info.size = 0;
+    param->info.is_return = false;
+    param->info.is_variable = false;
+    param->info.has_value = false;
+
     param->type = 0;
     param->enc_type = 0;
     list_head_init(&param->types);
-    param->is_return = false;
-    param->is_variable = false;
-    param->has_value = false;
     param->ctx = ctx;
     pst_dwarf_expr_init(&param->location);
     param->allocated = false;
@@ -287,8 +290,8 @@ pst_parameter* pst_parameter_new(pst_context* ctx)
 void pst_parameter_fini(pst_parameter* param)
 {
     clear(param);
-    if(param->name) {
-        pst_free(param->name);
+    if(param->info.name) {
+        pst_free(param->info.name);
     }
     if(param->allocated) {
         pst_free(param);

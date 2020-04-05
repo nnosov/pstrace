@@ -64,7 +64,7 @@ void pst_call_site_fini(pst_call_site* site);
 pst_call_site_param* pst_call_site_find(pst_call_site* site, pst_dwarf_expr* expr);
 bool pst_call_site_handle_dwarf(pst_call_site* site, Dwarf_Die* child);
 
-typedef struct __pst_function pst_function;
+typedef struct pst_function pst_function;
 // -----------------------------------------------------------------------------------
 // storage for all of  function's call sites
 // -----------------------------------------------------------------------------------

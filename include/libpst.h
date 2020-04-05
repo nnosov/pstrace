@@ -15,7 +15,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "libpst-types.h"
+
 typedef struct pst_handler pst_handler;
+typedef struct pst_function pst_function;
+typedef struct pst_parameter pst_parameter;
 
 /**
  * @brief allocate libpst handler and initialize the library
@@ -35,25 +39,48 @@ void pst_lib_fini(pst_handler* handler);
 
 
 /**
- * @defgroup unwind_simple
  * @brief Unwinds current stack trace using base information about program (i.e. function address, function name and line)
- */
-
-/**
- * @ingroup unwind_simple
- * @brief Save stack trace information to provided buffer in RAM
  * @param handler The handler obtained by pst_lib_init()
  * @return 1 on success, 0 on failure
  */
 int pst_unwind_simple(pst_handler* handler);
 
 /**
- * @ingroup unwind_simple
  * @brief Print unwound stack trace to internal buffer
  * @param handler The handler obtained by pst_lib_init()
- * @return pointer on zero terminated C string, NULL on failure
+ * @return pointer to zero terminated C string, NULL on failure
  */
 const char* pst_print_simple(pst_handler* handler);
+
+/**
+ * @brief Get next function handle in stack trace
+ * @param handler The handler obtained by pst_lib_init()
+ * @param current pointer to current function. NULL to get first
+ * @return pointer to next function's handle, NULL in case of end of list
+ */
+const pst_function* pst_get_next_function(pst_handler* handler, pst_function* current);
+
+/**
+ * @brief Get function's information (name, address, line)
+ * @param function Function's handle obtained by pst_get_next_function()
+ * @return pointer to function's info
+ */
+const pst_function_info* pst_get_function_info(pst_function* function);
+
+/**
+ * @brief Get next parameter's handle in function
+ * @param function Function's handler obtained by pst_get_next_function()
+ * @param current pointer to current parameter. NULL to get first
+ * @return pointer to next parameter's handle, NULL in case of end of list
+ */
+const pst_parameter* pst_get_next_parameter(pst_function* function, pst_parameter* current);
+
+/**
+ * @brief Get parameter's information (name, type, line etc)
+ * @param parameter Parameter's handle obtained by pst_get_next_parameter()
+ * @return pointer to parameter's info
+ */
+const pst_parameter_info* pst_get_parameter_info(pst_parameter* parameter);
 
 //
 // Advanced unwind routines.

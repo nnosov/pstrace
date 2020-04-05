@@ -195,7 +195,7 @@ void pst_call_site_fini(pst_call_site* site)
 // DW_TAG_GNU_call_site_parameter is defined under child DIE of DW_TAG_GNU_call_site and defines value of subroutine before calling it
 // relates to DW_OP_GNU_entry_value() handling in callee function to determine the value of an argument/variable of the callee
 // get DIE of return type
-bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result, pst_function* info)
+bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Die* result, pst_function* fn)
 {
     Dwarf_Die origin;
     Dwarf_Attribute attr_mem;
@@ -216,7 +216,7 @@ bool pst_call_site_storage_handle_dwarf(pst_call_site_storage* storage, Dwarf_Di
         attr = dwarf_attr(result, DW_AT_GNU_call_site_target, &attr_mem);
         if(attr) {
             pst_decl0(pst_dwarf_expr, expr);
-            if(handle_location(storage->ctx, &attr_mem, &expr, info->pc, info)) {
+            if(handle_location(storage->ctx, &attr_mem, &expr, fn->info.pc, fn)) {
                 target = expr.value;
                 pst_log(SEVERITY_DEBUG, "DW_AT_GNU_call_site_target: %#lX", target);
             }
@@ -310,7 +310,7 @@ pst_call_site* pst_call_site_storage_find(pst_call_site_storage* storage, pst_fu
     uint64_t start_pc = storage->ctx->base_addr + callee->lowpc;
     pst_call_site* cs = storage_call_site_by_target(storage, start_pc);
     if(!cs) {
-        cs = storage_call_site_by_origin(storage, callee->name);
+        cs = storage_call_site_by_origin(storage, callee->info.name);
     }
 
     return cs;

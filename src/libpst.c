@@ -11,7 +11,7 @@
 
 #include "utils/allocator.h"
 #include "dwarf/dwarf_handler.h"
-#include "dwarf/dwarf_function.h"
+#include "dwarf/dwarf_parameter.h"
 
 // allocate and initialize libpst library
 pst_handler* pst_lib_init(ucontext_t* hctx, void* buff, uint32_t size)
@@ -48,4 +48,24 @@ int pst_unwind_simple(pst_handler* h)
 int pst_unwind_pretty(pst_handler* h)
 {
     return pst_handler_handle_dwarf(h);
+}
+
+pst_parameter_info* pst_get_parameter_info(pst_parameter* parameter)
+{
+    return &parameter->info;
+}
+
+pst_function_info* pst_get_function_info(pst_function* function)
+{
+    return &function->info;
+}
+
+pst_function* pst_get_next_function(pst_handler* handler, pst_function* current)
+{
+    return pst_handler_next_function(handler, current);
+}
+
+pst_parameter* pst_get_next_parameter(pst_function* function, pst_parameter* current)
+{
+    return pst_function_next_parameter(function, current);
 }
