@@ -11,12 +11,17 @@
 
 #include "utils/allocator.h"
 #include "dwarf/dwarf_handler.h"
+#include "dwarf/dwarf_function.h"
 
 // allocate and initialize libpst library
-pst_handler* pst_lib_init(ucontext_t* hctx)
+pst_handler* pst_lib_init(ucontext_t* hctx, void* buff, uint32_t size)
 {
     // global
-    pst_alloc_init(&allocator);
+    if(!buff || !size) {
+        pst_alloc_init(&allocator);
+    } else {
+        pst_alloc_init_custom(&allocator, buff, size);
+    }
     pst_log_init_console(&logger);
 
     pst_new(pst_handler, handler, hctx);
@@ -33,59 +38,14 @@ void pst_lib_fini(pst_handler* h)
     pst_alloc_fini(&allocator);
 }
 
-// write stack trace information to provided file descriptor
-int pst_unwind_simple_fd(pst_handler* h, FILE* fd)
+// save stack trace information to provided buffer in RAM
+int pst_unwind_simple(pst_handler* h)
 {
-    int ret = pst_handler_unwind(h);
-    if(ret) {
-        fwrite(h->ctx.buff, 1, strlen(h->ctx.buff), fd);
-        return 0;
-    }
-
-    return -1;
+    return pst_handler_unwind(h);
 }
 
 // save stack trace information to provided buffer in RAM
-int pst_unwind_simple(pst_handler* h, char* buff, uint32_t buff_size)
+int pst_unwind_pretty(pst_handler* h)
 {
-    int ret = pst_handler_unwind(h);
-    if(ret) {
-        uint32_t cnt = buff_size < sizeof(h->ctx.buff) ? buff_size : sizeof(h->ctx.buff);
-        memcpy(buff, h->ctx.buff, cnt - 2);
-        buff[cnt - 1] = 0;
-
-        return 0;
-    }
-
-    return -1;
-}
-
-
-// write stack trace information to provided file descriptor
-int pst_unwind_pretty_fd(pst_handler* h, FILE* fd)
-{
-    int ret = pst_handler_handle_dwarf(h);
-    if(ret) {
-        pst_handler_print_dwarf(h);
-        fwrite(h->ctx.buff, 1, strlen(h->ctx.buff), fd);
-        return 0;
-    }
-
-    return -1;
-}
-
-// save stack trace information to provided buffer in RAM
-int pst_unwind_pretty(pst_handler* h, char* buff, uint32_t buff_size)
-{
-    int ret = pst_handler_handle_dwarf(h);
-    if(ret) {
-        pst_handler_print_dwarf(h);
-        uint32_t cnt = buff_size < sizeof(h->ctx.buff) ? buff_size : sizeof(h->ctx.buff);
-        memcpy(buff, h->ctx.buff, cnt - 2);
-        buff[cnt - 1] = 0;
-
-        return 0;
-    }
-
-    return -1;
+    return pst_handler_handle_dwarf(h);
 }

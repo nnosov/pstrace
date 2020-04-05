@@ -72,6 +72,7 @@ static bool get_frame(pst_function* fn)
 
     fn->ctx->print_expr(fn->ctx, cfa_ops, cfa_nops, NULL);
 
+    bool nret = true;
     pst_decl(pst_dwarf_stack, stack, fn->ctx);
     if(pst_dwarf_stack_calc(&stack, cfa_ops, cfa_nops, NULL, NULL) && pst_dwarf_stack_get_value(&stack, &fn->cfa)) {
         pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->name, fn->ctx->buff, fn->cfa);
@@ -79,12 +80,13 @@ static bool get_frame(pst_function* fn)
         // setup context to match CFA for frame
         fn->ctx->cfa = fn->cfa;
     } else {
+        nret = false;
         pst_log(SEVERITY_ERROR, "Failed to calculate CFA expression");
     }
 
     pst_dwarf_stack_fini(&stack);
 
-    return true;
+    return nret;
 }
 
 static pst_parameter* add_param(pst_function* fn)
@@ -189,16 +191,12 @@ bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
 bool pst_function_print_dwarf(pst_function* fn)
 {
     char* at = NULL;
-    if(!asprintf(&at, " at %s:%d, %p", fn->file, fn->line, (void*)fn->pc)) {
+    if(fn->file) {
+        if(!asprintf(&at, " at %s:%d, %p", fn->file, fn->line, (void*)fn->pc))
+            return false;
+    } else if(!asprintf(&at, " at %p", (void*)fn->pc)){
         return false;
     }
-    if(at[4] == ':' && at[5] == '-') {
-        free(at);
-        if(!asprintf(&at, " at %p", (void*)fn->pc)) {
-            return false;
-        }
-    }
-    //ctx->print(ctx, "%s:%d: ", file.c_str(), line);
 
     // handle return parameter and be safe if function haven't parameters (for example, dwar info for function is absent)
     pst_parameter* param = next_param(fn, NULL);
@@ -244,7 +242,7 @@ bool pst_function_print_dwarf(pst_function* fn)
     }
 
     if(!start_variable) {
-        fn->ctx->print(fn->ctx, ");%s\n", at);
+        fn->ctx->print(fn->ctx, ")%s\n", at);
     } else {
         fn->ctx->print(fn->ctx, "}\n");
     }
@@ -388,12 +386,7 @@ bool pst_function_unwind(pst_function* fn)
                 file = filename;
             }
             fn->file = pst_strdup(file);
-            fn->ctx->print(fn->ctx, "%s:%d", fn->file, fn->line);
-        } else {
-            fn->ctx->print(fn->ctx, "%p", (void*)fn->pc);
         }
-    } else {
-        fn->ctx->print(fn->ctx, "%p", (void*)fn->pc);
     }
 
     Dwfl_Module* module = dwfl_addrmodule(fn->ctx->dwfl, fn->pc);
@@ -405,7 +398,6 @@ bool pst_function_unwind(pst_function* fn)
             pst_log(SEVERITY_ERROR, "Failed to allocate memory");
             return false;
         }
-        fn->ctx->print(fn->ctx, " --> %s", function_name);
 
         char* str = strchr(function_name, '(');
         if(str) {

@@ -14,6 +14,7 @@
 #include "utils/list_head.h"
 #include "common.h"
 #include "context.h"
+#include "dwarf_function.h"
 
 typedef struct pst_handler {
 	pst_context	    ctx;		// context of unwinding
@@ -26,7 +27,6 @@ pst_handler* pst_handler_new(ucontext_t* hctx);
 void pst_handler_fini(pst_handler* h);
 
 bool pst_handler_handle_dwarf(pst_handler* h);
-void pst_handler_print_dwarf(pst_handler* h);
 bool pst_handler_unwind(pst_handler* h);
 
 #endif /* __PST_DWARF_HANDLER_H__ */

@@ -156,7 +156,7 @@ bool pst_handler_handle_dwarf(pst_handler* h)
     return true;
 }
 
-void pst_handler_print_dwarf(pst_handler* h)
+const char* pst_print_pretty(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
     h->ctx.print(&h->ctx, "DWARF-based stack trace information:\n");
@@ -166,6 +166,8 @@ void pst_handler_print_dwarf(pst_handler* h)
         pst_function_print_dwarf(fn);
         h->ctx.print(&h->ctx, "\n");
     }
+
+    return h->ctx.buff;
 }
 
 char *debuginfo_path = NULL;
@@ -177,53 +179,76 @@ Dwfl_Callbacks callbacks = {
 };
 
 #include <dlfcn.h>
+const char* pst_print_simple(pst_handler* h)
+{
+    h->ctx.clean_print(&h->ctx);
+    h->ctx.print(&h->ctx, "Simple unwind-based stack trace:\n");
+    uint32_t idx = 0;
+    for(pst_function* fn = next_function(h, NULL); fn; fn = next_function(h, fn)) {
+        h->ctx.print(&h->ctx, "[%-2d] ", idx);
+        h->ctx.print(fn->ctx, "%s() ", fn->name);
+        if(fn->file) {
+            h->ctx.print(fn->ctx, "at %s:%d, %p", fn->file, fn->line, (void*)fn->pc);
+        } else {
+            h->ctx.print(fn->ctx, "at %p", (void*)fn->pc);
+        }
+        h->ctx.print(&h->ctx, "\n");
+        idx++;
+    }
+
+    return h->ctx.buff;
+}
+
 
 bool pst_handler_unwind(pst_handler* h)
 {
-    h->ctx.clean_print(&h->ctx);
-    void*                       caller;     // pointer to the function which requested to unwind stack
+    void* caller = NULL;     // pointer to the function which requested to unwind stack
 
-#ifdef REG_RIP // x86_64
-    caller = (void *) h->ctx.hcontext->uc_mcontext.gregs[REG_RIP];
-    h->ctx.sp = h->ctx.hcontext->uc_mcontext.gregs[REG_RSP];
-    pst_log(SEVERITY_DEBUG, "Original caller's SP: %#lX", h->ctx.sp);
-#elif defined(REG_EIP) // x86_32
-    caller = (void *) uctx->uc_mcontext.gregs[REG_EIP]);
-#elif defined(__arm__)
-    caller = (void *) uctx->uc_mcontext.arm_pc);
-#elif defined(__aarch64__)
-    caller = (void *) uctx->uc_mcontext.pc);
-#elif defined(__ppc__) || defined(__powerpc) || defined(__powerpc__) || defined(__POWERPC__)
-    caller = (void *) uctx->uc_mcontext.regs->nip);
-#elif defined(__s390x__)
-    caller = (void *) uctx->uc_mcontext.psw.addr);
-#elif defined(__APPLE__) && defined(__x86_64__)
-    caller = (void *) uctx->uc_mcontext->__ss.__rip);
-#else
-#   error "unknown architecture!"
-#endif
+    if(h->ctx.hcontext) {
+        #ifdef REG_RIP // x86_64
+            caller = (void *) h->ctx.hcontext->uc_mcontext.gregs[REG_RIP];
+            h->ctx.sp = h->ctx.hcontext->uc_mcontext.gregs[REG_RSP];
+            pst_log(SEVERITY_DEBUG, "Original caller's SP: %#lX", h->ctx.sp);
+        #elif defined(REG_EIP) // x86_32
+            caller = (void *) h->uc_mcontext.gregs[REG_EIP]);
+        #elif defined(__arm__)
+            caller = (void *) h->uc_mcontext.arm_pc);
+        #elif defined(__aarch64__)
+            caller = (void *) h->uc_mcontext.pc);
+        #elif defined(__ppc__) || defined(__powerpc) || defined(__powerpc__) || defined(__POWERPC__)
+            caller = (void *) h->uc_mcontext.regs->nip);
+        #elif defined(__s390x__)
+            caller = (void *) h->uc_mcontext.psw.addr);
+        #elif defined(__APPLE__) && defined(__x86_64__)
+            caller = (void *) h->uc_mcontext->__ss.__rip);
+        #else
+        #   error "unknown architecture!"
+        #endif
+    }
 
     //handle = dlopen(NULL, RTLD_NOW);
-	Dl_info info;
-	dladdr(caller, &info);
-	h->ctx.base_addr = (uint64_t)info.dli_fbase;
-	pst_log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
+    if(caller) {
+        Dl_info info;
+        dladdr(caller, &info);
+        h->ctx.base_addr = (uint64_t)info.dli_fbase;
+        pst_log(SEVERITY_INFO, "Process address information: PC address: %p, base address: %p, object name: %s", caller, info.dli_fbase, info.dli_fname);
+    }
 
 	if(!h->ctx.dwfl) {
 	    h->ctx.dwfl = dwfl_begin(&callbacks);
 	    if(h->ctx.dwfl == NULL) {
-	        h->ctx.print(&h->ctx, "Failed to initialize libdw session for parse stack frames");
+	        pst_log(SEVERITY_ERROR, "Failed to initialize libdw session to parse stack frames");
 	        return false;
 	    }
 
 	    if(dwfl_linux_proc_report(h->ctx.dwfl, getpid()) != 0 || dwfl_report_end(h->ctx.dwfl, NULL, NULL) !=0) {
-	        h->ctx.print(&h->ctx, "Failed to parse debug section of executable");
+	        pst_log(SEVERITY_ERROR, "Failed to parse debug section of executable");
 	        dwfl_end(h->ctx.dwfl);
 	        h->ctx.dwfl = NULL;
 	        return false;
 	    }
 	}
-    h->ctx.print(&h->ctx, "Stack trace: caller = %p\n", caller);
+    pst_log(SEVERITY_INFO, "Stack trace: caller = %p\n", caller);
 
     unw_getcontext(&h->ctx.context);
     unw_init_local(&h->ctx.cursor, &h->ctx.context);
@@ -239,14 +264,15 @@ bool pst_handler_unwind(pst_handler* h)
             continue;
         }
 
-        if(pc == (uint64_t)caller) {
-            skip = 0;
-        } else if(skip) {
-            pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
-            continue;
+        if(caller) {
+            if(pc == (uint64_t)caller) {
+                skip = 0;
+            } else if(skip) {
+                pst_log(SEVERITY_DEBUG, "Skipping frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
+                continue;
+            }
         }
 
-        h->ctx.print(&h->ctx, "[%-2d] ", i);
         pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
         pst_function* last = last_function(h);
         pst_function* fn = add_function(h, NULL);
@@ -256,7 +282,6 @@ bool pst_handler_unwind(pst_handler* h)
         } else if(last) {
             last->parent = fn;
         }
-        h->ctx.print(&h->ctx, "\n");
     }
 
    return true;

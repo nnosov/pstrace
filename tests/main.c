@@ -62,15 +62,19 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
     printf("%s signal handled\n", strsignal(sig));
 	if((context != 0) && (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS || sig == SIGFPE))
 	{
-	    pst_handler* handler = pst_lib_init((ucontext_t*)context);
+	    pst_handler* handler = pst_lib_init((ucontext_t*)context, NULL, 0);
 	    if(!handler) {
 	        printf("Failed to allocate pst handler\n");
 	        return;
 	    }
 
-	    int ret = pst_unwind_simple_fd(handler, stdout);
-	    if(!ret) {
-	        pst_unwind_pretty_fd(handler, stdout);
+	    if(pst_unwind_simple(handler)) {
+	        printf("%s", pst_print_simple(handler));
+	        if(pst_unwind_pretty(handler)) {
+	            printf("%s", pst_print_pretty(handler));
+	        } else {
+	            printf("Failed to use DWARF for unwind stack trace\n");
+	        }
 	    } else {
 	        printf("No stack trace obtained\n");
 	    }

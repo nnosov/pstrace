@@ -17,33 +17,51 @@
 
 typedef struct pst_handler pst_handler;
 
-// allocate libpst handler and initialize the library
-pst_handler* pst_lib_init(ucontext_t* hctx);
+/**
+ * @brief allocate libpst handler and initialize the library
+ * @param context context of process given to signal handler of a program. If NULL, then we are not in signal handler
+ * @param buff pointer to buffer by libpst custom allocator(i.e. no malloc() will beused). if NULL, then standard allocator will be used
+ * @param size of 'buff'
+ *
+ * @return pointer to handler to be used for all other operations. NULL in case of error
+ */
+pst_handler* pst_lib_init(ucontext_t* context, void* buff, uint32_t size);
 
-// deallocate libpst handler and deinitialize the library
-void pst_lib_fini(pst_handler* h);
+/**
+ * @brief deallocate libpst handler and deinitialize the library
+ * @param handler library handler previously initialized by 'pst_lib_init()'
+ */
+void pst_lib_fini(pst_handler* handler);
 
 
-//
-// Base unwind routines.
-// Unwinds current stack trace using base information about program (i.e. print out address, function name)
-//
+/**
+ * @defgroup unwind_simple
+ * @brief Unwinds current stack trace using base information about program (i.e. function address, function name and line)
+ */
 
-// write stack trace information to provided file descriptor
-int pst_unwind_simple_fd(pst_handler* h, FILE* fd);
+/**
+ * @ingroup unwind_simple
+ * @brief Save stack trace information to provided buffer in RAM
+ * @param handler The handler obtained by pst_lib_init()
+ * @return 1 on success, 0 on failure
+ */
+int pst_unwind_simple(pst_handler* handler);
 
-// save stack trace information to provided buffer in RAM
-int pst_unwind_simple(pst_handler* h, char* buff, uint32_t buff_size);
+/**
+ * @ingroup unwind_simple
+ * @brief Print unwound stack trace to internal buffer
+ * @param handler The handler obtained by pst_lib_init()
+ * @return pointer on zero terminated C string, NULL on failure
+ */
+const char* pst_print_simple(pst_handler* handler);
 
 //
 // Advanced unwind routines.
 // Additionally to pst_unwind_simple(...) provides types of parameters and variables in functions and their values if possible
 //
 
-// write stack trace information to provided file descriptor
-int pst_unwind_pretty_fd(pst_handler* h, FILE* fd);
-
 // save stack trace information to provided buffer in RAM
-int pst_unwind_pretty(pst_handler* h, char* buff, uint32_t buff_size);
+int pst_unwind_pretty(pst_handler* h);
+const char* pst_print_pretty(pst_handler* h);
 
 #endif /* __LIBPST_EXTERNAL_H_ */
