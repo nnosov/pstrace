@@ -6,19 +6,7 @@
  */
 
 #include <inttypes.h>
-#include <stddef.h>
-#include <dwarf.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <limits.h>
-#include <elfutils/libdwfl.h>
-#include <libunwind.h>
-
-#include "common.h"
-
-#include "dwarf/dwarf_operations.h"
-#include "utils/log.h"
-#include "arch/registers.h"
+#include <stdbool.h>
 
 int32_t decode_sleb128(uint8_t *sleb128)
 {
