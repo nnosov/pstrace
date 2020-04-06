@@ -2,11 +2,9 @@
 
 ## Table of Contents
 * [Dependencies](#dependencies)
-
+* [Usage](#usage)
 * [Commands to work with debug information](#commands-to-work-with-debug-information)
-
 * [Unwinding-related gcc options](#unwinding-related-gcc-options)
-
 * [Useful links](#useful-links)
 
 The goal of the project is to enable C/C++ (and in future other languages) developers to get informative  stack trace in case of program crash, for example inside of segmentation fault handler. The key feature is to log not only function address/name/line but additionally (if DWARF `.debug_info` section is present) values of function's parameters and variables.
@@ -22,6 +20,20 @@ Third stage is to dump dereferenced pointers to data types with pointer validati
 ## Dependencies
 
 Currently library mostly depends on `libunwind` library which used to unwind function's stack frames from stack in signal handler, `libdw` library which gives access to DWARF information of executed process if it present and `libiberty` which provides demangling of function names for C++ and other languages.
+
+## Usage
+
+To build, install these packages:
+
+1. **sudo apt-get install libdw-dev libunwind-dev libiberty-dev**
+
+2. **git clone https://github.com/nnosov/pstrace** 
+
+3. **cd pstrace**
+
+4. **make**
+
+As an example how to use library, see tests/main.c
 
 ## commands to work with debug information
 
