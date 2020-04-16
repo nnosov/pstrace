@@ -146,15 +146,15 @@ bool pst_handler_handle_dwarf(pst_handler* h)
     //for(pst_function* fun = next_function(NULL); fun; fun = next_function(fun)) {
     for(pst_function* fun = last_function(h); fun; fun = prev_function(h, fun)) {
         dladdr((void*)(fun->info.pc), &info);
-        pst_log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX", fun->info.name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->sp : 0);
+        pst_log(SEVERITY_INFO, "Function %s(...): module name: %s, base address: %p, CFA: %#lX",
+                fun->info.name, info.dli_fname, info.dli_fbase, fun->parent ? fun->parent->info.sp : 0);
 
         // setup context
         h->ctx.module       = dwfl_addrmodule(h->ctx.dwfl, fun->info.pc);
         h->ctx.base_addr    = (uint64_t)info.dli_fbase;
-        h->ctx.curr_frame   = &fun->cursor;
-        h->ctx.sp           = fun->sp;
-        h->ctx.cfa          = fun->cfa;
-        h->ctx.curr_frame   = &fun->cursor;
+        h->ctx.curr_frame   = &fun->info.context;
+        h->ctx.sp           = fun->info.sp;
+        h->ctx.cfa          = fun->info.cfa;
 
         get_dwarf_function(h, fun);
     }
@@ -282,7 +282,7 @@ bool pst_handler_unwind(pst_handler* h)
         pst_log(SEVERITY_DEBUG, "Analyze frame #%d: PC = %#lX, SP = %#lX", i, pc, sp);
         pst_function* last = last_function(h);
         pst_function* fn = add_function(h, NULL);
-        fn->info.pc = pc; fn->sp = sp;
+        fn->info.pc = pc; fn->info.sp = sp;
         if(!pst_function_unwind(fn)) {
             del_function(fn);
         } else if(last) {

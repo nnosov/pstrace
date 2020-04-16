@@ -307,7 +307,7 @@ void pst_call_site_storage_del(pst_call_site_storage* storage, pst_call_site* st
 
 pst_call_site* pst_call_site_storage_find(pst_call_site_storage* storage, pst_function* callee)
 {
-    uint64_t start_pc = storage->ctx->base_addr + callee->lowpc;
+    uint64_t start_pc = storage->ctx->base_addr + callee->info.lowpc;
     pst_call_site* cs = storage_call_site_by_target(storage, start_pc);
     if(!cs) {
         cs = storage_call_site_by_origin(storage, callee->info.name);

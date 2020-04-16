@@ -12,13 +12,18 @@
 #include <libunwind.h>
 
 typedef struct {
-    char*       name;   ///< demangled name of the function. NULL if function name resolution failed
-    char*       file;   ///< file name where the function is defined. NULL if library failed to get file name
-    int         line;   ///< line of definition of the function. -1 if library failed to get file line
-    unw_word_t  pc;     ///< address between LowPC & HighPC (plus base address offset). actually, address of currently executed command in function
+    char*           name;   ///< demangled name of the function. NULL if function name resolution failed
+    char*           file;   ///< file name where the function is defined. NULL if library failed to get file name
+    int             line;   ///< line of definition of the function. -1 if library failed to get file line
+    unw_word_t      pc;     ///< address between LowPC & HighPC (plus base address offset). actually, address of currently executed command in function
+    unw_word_t      lowpc;  ///< offset to start of the function against base address
+    unw_word_t      highpc; ///< offset to the next address after the end of the function against base address
+    unw_word_t      sp;     ///< SP register in function's frame
+    unw_word_t      cfa;    ///< CFA (Canonical Frame Address) of the function. !!! Don't use CFA provided by libunwind, it's not valid !!!
+    unw_cursor_t    context;///< Function's frame including register's values
 } pst_function_info;
 
-/// @brief bitmask of parameter options
+/// @brief bitmask of parameter's options
 typedef enum {
     // scope & access
     PARAM_CONST         = 0x00000001,   ///< constant access

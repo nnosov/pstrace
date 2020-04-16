@@ -22,18 +22,11 @@
 // pst_function
 // -----------------------------------------------------------------------------------
 typedef struct pst_function {
-    list_node               node;
-
-    Dwarf_Addr              lowpc;      // offset to start of the function against base address
-    Dwarf_Addr              highpc;     // offset to the next address after the end of the function against base address
+    list_node               node;       // uplink
     Dwarf_Die*              die;        // DWARF DIE containing definition of the function
-    pst_function_info       info;
-    list_head               params;     // function's parameters
-    pst_call_site_storage   call_sites;
-
-    unw_word_t              sp;         // SP register in function's frame
-    unw_word_t              cfa;        // CFA (Canonical Frame Address) of the function
-    unw_cursor_t            cursor;     // copy of stack state of the function
+    pst_function_info       info;       // information about the function itself
+    list_head               params;     // parameters of the function
+    pst_call_site_storage   call_sites; // call-sites of the function
     pst_function*           parent;     // parent function in call trace (caller)
     Dwarf_Frame*            frame;      // function's stack frame
     pst_context*            ctx;        // context of unwinding

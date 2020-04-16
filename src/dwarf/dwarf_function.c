@@ -74,11 +74,11 @@ static bool get_frame(pst_function* fn)
 
     bool nret = true;
     pst_decl(pst_dwarf_stack, stack, fn->ctx);
-    if(pst_dwarf_stack_calc(&stack, cfa_ops, cfa_nops, NULL, NULL) && pst_dwarf_stack_get_value(&stack, &fn->cfa)) {
-        pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->info.name, fn->ctx->buff, fn->cfa);
+    if(pst_dwarf_stack_calc(&stack, cfa_ops, cfa_nops, NULL, NULL) && pst_dwarf_stack_get_value(&stack, &fn->info.cfa)) {
+        pst_log(SEVERITY_INFO, "Function %s(...): CFA expression: %s ==> %#lX", fn->info.name, fn->ctx->buff, fn->info.cfa);
 
         // setup context to match CFA for frame
-        fn->ctx->cfa = fn->cfa;
+        fn->ctx->cfa = fn->info.cfa;
     } else {
         nret = false;
         pst_log(SEVERITY_ERROR, "Failed to calculate CFA expression");
@@ -261,21 +261,21 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 
     // get list of offsets from process base address of continuous memory ranges where function's code resides
 //  if(dwarf_haspc(d, pc)) {
-    dwarf_lowpc(d, &fn->lowpc);
-    dwarf_highpc(d, &fn->highpc);
+    dwarf_lowpc(d, &fn->info.lowpc);
+    dwarf_highpc(d, &fn->info.highpc);
 //  } else {
 //      pst_log(SEVERITY_ERROR, "Function's '%s' DIE hasn't definitions of memory offsets of function's code", dwarf_diename(d));
 //      return false;
 //  }
 
     unw_proc_info_t info;
-    unw_get_proc_info(&fn->cursor, &info);
+    unw_get_proc_info(&fn->info.context, &info);
     fn->ctx->clean_print(fn->ctx);
 
     pst_log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
-            dwarf_diename(d), fn->lowpc, fn->highpc, fn->info.pc - fn->ctx->base_addr, info.start_ip, info.start_ip - fn->ctx->base_addr);
+            dwarf_diename(d), fn->info.lowpc, fn->info.highpc, fn->info.pc - fn->ctx->base_addr, info.start_ip, info.start_ip - fn->ctx->base_addr);
     fn->ctx->print_registers(fn->ctx, 0x0, 0x10);
-    pst_log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), fn->parent ? fn->parent->sp : 0, fn->ctx->buff);
+    pst_log(SEVERITY_INFO, "Function %s(...): CFA: %#lX %s", dwarf_diename(d), fn->parent ? fn->parent->info.sp : 0, fn->ctx->buff);
     pst_log(SEVERITY_INFO, "Function %s(...): %s", dwarf_diename(d), fn->ctx->buff);
 
     // determine function's stack frame base
@@ -418,20 +418,22 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
 {
     list_node_init(&fn->node);
 
-    // fields
-    fn->lowpc = 0;
-    fn->highpc = 0;
+    // user visible fields
     fn->info.pc = 0;
+    fn->info.lowpc = 0;
+    fn->info.highpc = 0;
+    bzero(&fn->info.context, sizeof(fn->info.context));
     fn->info.name = NULL;
     fn->info.line = -1;
     fn->info.file = NULL;
+    fn->info.sp = 0;
+
+    // internal fields
     fn->die = NULL;
     list_head_init(&fn->params);
     pst_call_site_storage_init(&fn->call_sites, _ctx);
 
-    fn->sp = 0;
-    fn->cfa = 0;
-    memcpy(&fn->cursor, &_ctx->cursor, sizeof(fn->cursor));
+    memcpy(&fn->info.context, &_ctx->cursor, sizeof(fn->info.context));
     fn->parent = _parent;
     fn->frame = NULL;
     fn->ctx = _ctx;
