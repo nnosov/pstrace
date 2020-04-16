@@ -19,11 +19,11 @@ typedef struct __pst_type {
     list_node       node;       // uplink
 
     char*           name;       // type name
-    uint32_t        type;       // DW_AT_XXX type
+    pst_param_flags type;       // type bit
     bool            allocated;  // whether this struct was allocated or not
 } pst_type;
-void pst_type_init(pst_type* t, const char* name, uint32_t type);
-pst_type* pst_type_new(const char* name, uint32_t type);
+void pst_type_init(pst_type* t, const char* name, pst_param_flags type);
+pst_type* pst_type_new(const char* name, pst_param_flags type);
 void pst_type_fini(pst_type* t);
 
 typedef struct pst_function pst_function;
@@ -49,6 +49,6 @@ void pst_parameter_fini(pst_parameter* param);
 bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun);
 bool pst_parameter_print_dwarf(pst_parameter* param);
 bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base);
-pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, int type);
+pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, pst_param_flags type);
 
 #endif /* __PST_DWARF_PARAMETER_H__ */

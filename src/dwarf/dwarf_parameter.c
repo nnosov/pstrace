@@ -16,15 +16,19 @@
 //
 // pst_type
 //
-void pst_type_init(pst_type* t, const char* name, uint32_t type)
+void pst_type_init(pst_type* t, const char* name, pst_param_flags type)
 {
     list_node_init(&t->node);
-    t->name = pst_strdup(name);
+    if(name) {
+        t->name = pst_strdup(name);
+    } else {
+        t->name = NULL;
+    }
     t->type = type;
     t->allocated = false;
 }
 
-pst_type* pst_type_new(const char* name, uint32_t type)
+pst_type* pst_type_new(const char* name, pst_param_flags type)
 {
     pst_type* nt = pst_alloc(pst_type);
     if(nt) {
@@ -37,7 +41,9 @@ pst_type* pst_type_new(const char* name, uint32_t type)
 
 void pst_type_fini(pst_type* t)
 {
-    pst_free(t->name);
+    if(t->name) {
+        pst_free(t->name);
+    }
     if(t->allocated) {
         pst_free(t);
     }
@@ -54,6 +60,14 @@ static void clear(pst_parameter* param)
         list_del(&t->node);
         pst_type_fini(t);
     }
+
+    if(param->info.name) {
+        pst_free(param->info.name);
+    }
+
+    if(param->info.type_name) {
+        pst_free(param->info.type_name);
+    }
 }
 
 static pst_type* next_type(pst_parameter* param, pst_type* t)
@@ -69,30 +83,30 @@ static pst_type* next_type(pst_parameter* param, pst_type* t)
 
 bool pst_parameter_print_dwarf(pst_parameter* param)
 {
-    if(list_count(&param->types)) {
-        if(param->info.flags & PARAM_RETURN) {
-            param->ctx->print(param->ctx, "%s", next_type(param, NULL)->name);
-        } else {
-            if(param->info.flags & PARAM_HAS_VALUE) {
-                param->ctx->print(param->ctx, "%s %s = 0x%lX", next_type(param, NULL)->name, param->info.name, param->info.value);
-            } else {
-                param->ctx->print(param->ctx, "%s %s = <undefined>", next_type(param, NULL)->name, param->info.name);
-            }
-        }
+    if(param->info.flags & PARAM_RETURN) {
+        param->ctx->print(param->ctx, "%s", param->info.type_name);
     } else {
         if(param->info.flags & PARAM_HAS_VALUE) {
-            param->ctx->print(param->ctx, "%s = 0x%lX", param->info.name, param->info.value);
+            param->ctx->print(param->ctx, "%s%s %s = 0x%lX",
+                param->info.type_name ? param->info.type_name : "void"/*hack to represent void since DWARF has no ability to determine it another way*/,
+                param->info.flags & PARAM_TYPE_POINTER ? "*" : "", param->info.name, param->info.value);
         } else {
-            param->ctx->print(param->ctx, "%s = <undefined>", param->info.name);
+            param->ctx->print(param->ctx, "%s%s %s = <undefined>",
+                param->info.type_name ? param->info.type_name : "void"/*hack to represent void since DWARF has no ability to determine it another way*/,
+                param->info.flags & PARAM_TYPE_POINTER ? "*" : "", param->info.name);
         }
     }
     return true;
 }
 
-pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, int type)
+pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, pst_param_flags type)
 {
     pst_new(pst_type, t, name, type);
     list_add_bottom(&param->types, &t->node);
+    param->info.flags |= type;
+    if(name && !param->info.type_name) {
+        param->info.type_name = pst_strdup(name);
+    }
 
     return t;
 }
@@ -110,10 +124,10 @@ bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base)
         return false;
     }
 
+    param->info.size = 64;
     switch (dwarf_tag(&ret_die)) {
         case DW_TAG_base_type: {
             // get Size attribute and it's value
-            param->info.size = 0;
             attr = dwarf_attr(&ret_die, DW_AT_byte_size, &attr_mem);
             if(attr) {
                 dwarf_formudata(attr, &param->info.size);
@@ -126,44 +140,75 @@ bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base)
             if(attr) {
                 param->enc_type = 0;
                 dwarf_formudata(attr, &param->enc_type);
+                static const char* sizemod[] = {"", "char", "short", "", "int", "", "", "", "long long"};
+                char name[32]; name[0] = 0;
+                switch (param->enc_type) {
+                    case DW_ATE_boolean:
+                        pst_parameter_add_type(param, "bool", PARAM_TYPE_BOOL);
+                        break;
+                    case DW_ATE_address:
+                        pst_parameter_add_type(param, NULL, PARAM_TYPE_POINTER);
+                        break;
+                    case DW_ATE_signed:
+                        snprintf(name, sizeof(name), "signed %s", sizemod[param->info.size & 0x0F]);
+                        pst_parameter_add_type(param, name, PARAM_TYPE_INT);
+                        break;
+                    case DW_ATE_unsigned:
+                        snprintf(name, sizeof(name), "unsigned %s", sizemod[param->info.size & 0x0F]);
+                        pst_parameter_add_type(param, name, PARAM_TYPE_UINT);
+                        break;
+                    case DW_ATE_signed_char:
+                        pst_parameter_add_type(param, "char", PARAM_TYPE_CHAR);
+                        break;
+                    case DW_ATE_unsigned_char:
+                        pst_parameter_add_type(param, "unsigned char", PARAM_TYPE_UCHAR);
+                        break;
+                    case DW_ATE_float:
+                    case DW_ATE_complex_float:
+                    case DW_ATE_imaginary_float:
+                    case DW_ATE_decimal_float:
+                        pst_parameter_add_type(param, "float", PARAM_TYPE_FLOAT);
+                        break;
+                }
+
             }
             break;
         }
         case DW_TAG_array_type:
-            pst_log(SEVERITY_DEBUG, "array type");
-            pst_parameter_add_type(param, "[]", DW_TAG_array_type);
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_ARRAY);
             break;
         case DW_TAG_structure_type:
-            pst_log(SEVERITY_DEBUG, "structure type");
-            pst_parameter_add_type(param, "struct", DW_TAG_structure_type);
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_STRUCT);
             break;
         case DW_TAG_union_type:
-            pst_log(SEVERITY_DEBUG, "union type");
-            pst_parameter_add_type(param, "union", DW_TAG_union_type);
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_UNION);
             break;
         case DW_TAG_class_type:
-            pst_log(SEVERITY_DEBUG, "class type");
-            pst_parameter_add_type(param, "class", DW_TAG_class_type);
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_CLASS);
             break;
         case DW_TAG_pointer_type:
-            pst_log(SEVERITY_DEBUG, "pointer type");
-            pst_parameter_add_type(param, "*", DW_TAG_pointer_type);
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_POINTER);
             break;
         case DW_TAG_enumeration_type:
-            pst_log(SEVERITY_DEBUG, "enumeration type");
-            pst_parameter_add_type(param, "enum", DW_TAG_enumeration_type);
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_ENUM);
             break;
         case DW_TAG_const_type:
-            pst_log(SEVERITY_DEBUG, "constant type");
-            pst_parameter_add_type(param, "const", DW_TAG_const_type);
+            pst_parameter_add_type(param, NULL, PARAM_CONST);
             break;
         case DW_TAG_subroutine_type:
-            pst_log(SEVERITY_DEBUG, "Skipping subroutine type");
+            pst_log(SEVERITY_DEBUG, "%s: Skipping subroutine type", __FUNCTION__);
             break;
-        case DW_TAG_typedef:
-            pst_log(SEVERITY_DEBUG, "typedef '%s' type", dwarf_diename(&ret_die));
-            pst_parameter_add_type(param, dwarf_diename(&ret_die), DW_TAG_typedef);
+        case DW_TAG_typedef: {
+            pst_parameter_add_type(param, dwarf_diename(&ret_die), PARAM_TYPE_TYPEDEF);
             break;
+        }
+        case DW_TAG_unspecified_type:
+            pst_parameter_add_type(param, "void", PARAM_TYPE_VOID);
+            break;
+        case DW_TAG_reference_type:
+            pst_parameter_add_type(param, NULL, PARAM_TYPE_REF);
+            break;
+
         default:
             pst_log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
             break;
@@ -208,12 +253,13 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
             pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", param->ctx->buff);
         }
     } else if(dwarf_hasattr(result, DW_AT_const_value)) {
+        param->info.flags |= PARAM_CONST;
         // no locations definitions, value is constant, known by DWARF directly
         attr = dwarf_attr(result, DW_AT_const_value, &attr_mem);
         switch (dwarf_whatform(attr)) {
             case DW_FORM_string:
-                // do nothing for now
-                pst_log(SEVERITY_WARNING, "Const value form DW_FORM_string value = %s.", dwarf_formstring(attr));
+                param->info.value = (unw_word_t)dwarf_formstring(attr);
+                param->info.flags |= PARAM_HAS_VALUE;
                 break;
             case DW_FORM_data1:
             case DW_FORM_data2:
@@ -235,6 +281,8 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
             pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->info.value);
         }
     }
+
+    //param->info.value &=0xFFFFFFFFFFFFFFFF >> (64 - ((param->info.size * 8) & 0x0F));
 
     // Additionally handle these attributes:
     // 1. DW_AT_default_value to get information about default value for DW_TAG_formal_parameter type of function
@@ -263,6 +311,7 @@ void pst_parameter_init(pst_parameter* param, pst_context* ctx)
     param->die = NULL;
     // info field
     param->info.name = NULL;
+    param->info.type_name = NULL;
     param->info.line = 0;
     param->info.size = 0;
     param->info.flags = 0;
@@ -288,9 +337,6 @@ pst_parameter* pst_parameter_new(pst_context* ctx)
 void pst_parameter_fini(pst_parameter* param)
 {
     clear(param);
-    if(param->info.name) {
-        pst_free(param->info.name);
-    }
     if(param->allocated) {
         pst_free(param);
     }
