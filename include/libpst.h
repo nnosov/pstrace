@@ -84,11 +84,21 @@ const pst_parameter_info* pst_get_parameter_info(pst_parameter* parameter);
 
 //
 // Advanced unwind routines.
-// Additionally to pst_unwind_simple(...) provides types of parameters and variables in functions and their values if possible
+// Additionally to pst_unwind_simple() provides types of parameters and variables in functions and their values if possible
 //
 
-// save stack trace information to provided buffer in RAM
-int pst_unwind_pretty(pst_handler* h);
-const char* pst_print_pretty(pst_handler* h);
+/**
+ * @brief Unwinds current stack trace using DWARF information about program if .debug_info section is present in executable
+ * @param handler The handler obtained by pst_lib_init()
+ * @return 1 on success, 0 on failure
+ */
+int pst_unwind_pretty(pst_handler* handler);
+
+/**
+ * @brief Print unwound Advanced stack trace(using DWARF information) to internal buffer
+ * @param handler The handler obtained by pst_lib_init()
+ * @return pointer to zero terminated C string, NULL on failure
+ */
+const char* pst_print_pretty(pst_handler* handler);
 
 #endif /* __LIBPST_EXTERNAL_H_ */
