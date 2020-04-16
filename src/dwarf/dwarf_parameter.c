@@ -256,27 +256,28 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
         param->info.flags |= PARAM_CONST;
         // no locations definitions, value is constant, known by DWARF directly
         attr = dwarf_attr(result, DW_AT_const_value, &attr_mem);
+        param->info.flags |= PARAM_HAS_VALUE;
         switch (dwarf_whatform(attr)) {
             case DW_FORM_string:
                 param->info.value = (unw_word_t)dwarf_formstring(attr);
-                param->info.flags |= PARAM_HAS_VALUE;
                 break;
             case DW_FORM_data1:
             case DW_FORM_data2:
             case DW_FORM_data4:
             case DW_FORM_data8:
                 dwarf_formudata(attr, &param->info.value);
-                param->info.flags |= PARAM_HAS_VALUE;
                 break;
             case DW_FORM_sdata:
                 dwarf_formsdata(attr, (int64_t*)&param->info.value);
-                param->info.flags |= PARAM_HAS_VALUE;
                 break;
             case DW_FORM_udata:
                 dwarf_formudata(attr, &param->info.value);
-                param->info.flags |= PARAM_HAS_VALUE;
                 break;
+            default:
+                pst_log(SEVERITY_WARNING, "Unknown form '0x%X' of attribute for Constant value", dwarf_whatform(attr));
+                param->info.flags &= ~PARAM_HAS_VALUE;
         }
+
         if(param->info.flags & PARAM_HAS_VALUE) {
             pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->info.value);
         }
