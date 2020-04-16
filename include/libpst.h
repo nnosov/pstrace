@@ -12,7 +12,6 @@
 
 //system
 #include <ucontext.h>
-#include <stdio.h>
 #include <stdint.h>
 
 #include "libpst-types.h"
@@ -20,6 +19,10 @@
 typedef struct pst_handler pst_handler;
 typedef struct pst_function pst_function;
 typedef struct pst_parameter pst_parameter;
+
+//
+// Initialization of the library
+//
 
 /**
  * @brief allocate libpst handler and initialize the library
@@ -37,6 +40,10 @@ pst_handler* pst_lib_init(ucontext_t* context, void* buff, uint32_t size);
  */
 void pst_lib_fini(pst_handler* handler);
 
+//
+// Basic unwind routines.
+// Allows to retrieve stack trace information about function's name, line and file if possibly
+//
 
 /**
  * @brief Unwinds current stack trace using base information about program (i.e. function address, function name and line)
