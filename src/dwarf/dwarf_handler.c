@@ -134,6 +134,12 @@ static pst_function* last_function(pst_handler* h)
 
 bool pst_handler_handle_dwarf(pst_handler* h)
 {
+    if(!h->functions.count) {
+        if(!pst_handler_unwind(h)) {
+            return false;
+        }
+    }
+
     h->ctx.clean_print(&h->ctx);
     Dl_info info;
 
