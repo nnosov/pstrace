@@ -70,17 +70,17 @@ static pst_type* next_type(pst_parameter* param, pst_type* t)
 bool pst_parameter_print_dwarf(pst_parameter* param)
 {
     if(list_count(&param->types)) {
-        if(!param->info.is_return) {
-            if(param->info.has_value) {
+        if(param->info.flags & PARAM_RETURN) {
+            param->ctx->print(param->ctx, "%s", next_type(param, NULL)->name);
+        } else {
+            if(param->info.flags & PARAM_HAS_VALUE) {
                 param->ctx->print(param->ctx, "%s %s = 0x%lX", next_type(param, NULL)->name, param->info.name, param->info.value);
             } else {
                 param->ctx->print(param->ctx, "%s %s = <undefined>", next_type(param, NULL)->name, param->info.name);
             }
-        } else {
-            param->ctx->print(param->ctx, "%s", next_type(param, NULL)->name);
         }
     } else {
-        if(param->info.has_value) {
+        if(param->info.flags & PARAM_HAS_VALUE) {
             param->ctx->print(param->ctx, "%s = 0x%lX", param->info.name, param->info.value);
         } else {
             param->ctx->print(param->ctx, "%s = <undefined>", param->info.name);
@@ -185,7 +185,7 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
     Dwarf_Attribute* attr;
 
     param->info.name = pst_strdup(dwarf_diename(result));
-    param->info.is_variable = (dwarf_tag(result) == DW_TAG_variable);
+    param->info.flags |= (dwarf_tag(result) == DW_TAG_variable) ? PARAM_VARIABLE : 0;
 
     dwarf_decl_line(result, (int*)&param->info.line);
     // Get reference to attribute type of the parameter/variable
@@ -203,7 +203,7 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
 
         if(handle_location(param->ctx, attr, &param->location, pc, fun)) {
             param->info.value = param->location.value;
-            param->info.has_value = true;
+            param->info.flags |= PARAM_HAS_VALUE;
         } else {
             pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", param->ctx->buff);
         }
@@ -220,18 +220,18 @@ bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_fun
             case DW_FORM_data4:
             case DW_FORM_data8:
                 dwarf_formudata(attr, &param->info.value);
-                param->info.has_value = true;
+                param->info.flags |= PARAM_HAS_VALUE;
                 break;
             case DW_FORM_sdata:
                 dwarf_formsdata(attr, (int64_t*)&param->info.value);
-                param->info.has_value = true;
+                param->info.flags |= PARAM_HAS_VALUE;
                 break;
             case DW_FORM_udata:
                 dwarf_formudata(attr, &param->info.value);
-                param->info.has_value = true;
+                param->info.flags |= PARAM_HAS_VALUE;
                 break;
         }
-        if(param->info.has_value) {
+        if(param->info.flags & PARAM_HAS_VALUE) {
             pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->info.value);
         }
     }
@@ -265,9 +265,7 @@ void pst_parameter_init(pst_parameter* param, pst_context* ctx)
     param->info.name = NULL;
     param->info.line = 0;
     param->info.size = 0;
-    param->info.is_return = false;
-    param->info.is_variable = false;
-    param->info.has_value = false;
+    param->info.flags = 0;
 
     param->type = 0;
     param->enc_type = 0;

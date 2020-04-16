@@ -200,7 +200,7 @@ bool pst_function_print_dwarf(pst_function* fn)
 
     // handle return parameter and be safe if function haven't parameters (for example, dwar info for function is absent)
     pst_parameter* param = pst_function_next_parameter(fn, NULL);
-    if(param && param->info.is_return) {
+    if(param && (param->info.flags & PARAM_RETURN)) {
         // print return value type, function name and start list of parameters
         pst_parameter_print_dwarf(param);
         fn->ctx->print(fn->ctx, " %s(", fn->info.name);
@@ -211,14 +211,14 @@ bool pst_function_print_dwarf(pst_function* fn)
 
     bool first = true; bool start_variable = false;
     for(; param; param = pst_function_next_parameter(fn, param)) {
-        if(param->info.is_return) {
+        if(param->info.flags & PARAM_RETURN) {
             // print return value type, function name and start list of parameters
             pst_parameter_print_dwarf(param);
             fn->ctx->print(fn->ctx, " %s(", fn->info.name);
             continue;
         }
 
-        if(param->info.is_variable) {
+        if(param->info.flags & PARAM_VARIABLE) {
             if(!start_variable) {
                 fn->ctx->print(fn->ctx, ")%s\n", at);
                 fn->ctx->print(fn->ctx, "{\n");
@@ -306,7 +306,7 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 
     // Get reference to return attribute type of the function
     // may be to use dwfl_module_return_value_location() instead
-    pst_parameter* ret_p = add_param(fn); ret_p->info.is_return = true;
+    pst_parameter* ret_p = add_param(fn); ret_p->info.flags |= PARAM_RETURN;
     attr = dwarf_attr(fn->die, DW_AT_type, &attr_mem);
     if(attr) {
         if(!pst_parameter_handle_type(ret_p, attr)) {
