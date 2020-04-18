@@ -11,7 +11,7 @@ The goal of the project is to enable C/C++ (and in future other languages) devel
 
 Currently development is focused on `x86_64` architecture and for Linux OS, but further may be expanded to other architectures and OS if it will be demanded and some people will like to contribute to the project to support this architecture and OS.
 
-As a first stage the goal is to dump only C/C++ base types such as pointer, boolean, integer etc.
+As a first stage the goal is to dump only C/C++ base types such as pointer, boolean, integer etc**(done)**.
 
 Second stage is to dump composite types such as a C structures, arrays, C++ classes, etc.
 
