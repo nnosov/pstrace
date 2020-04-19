@@ -44,13 +44,16 @@ typedef enum {
     PARAM_TYPE_CHAR     = 0x00002000,   ///< character
     PARAM_TYPE_UCHAR    = 0x00004000,   ///< unsigned character
     PARAM_TYPE_REF      = 0x00008000,   ///< reference
+    PARAM_TYPE_STRING   = 0x00010000,	///< pointer to C zero terminated string
+    PARAM_TYPE_UNSPEC   = 0x00020000,	///< variable number of arguments (... in C/C++)
     // complex types
-    PARAM_TYPE_ARRAY    = 0x00010000,   ///< array
-    PARAM_TYPE_STRUCT   = 0x00020000,   ///< structure
-    PARAM_TYPE_UNION    = 0x00040000,   ///< union
-    PARAM_TYPE_ENUM     = 0x00080000,   ///< enumeration
-    PARAM_TYPE_CLASS    = 0x00100000,   ///< class
-    PARAM_TYPE_TYPEDEF  = 0x00200000,   ///< type definition
+    PARAM_TYPE_ARRAY    = 0x00040000,   ///< array
+    PARAM_TYPE_STRUCT   = 0x00080000,   ///< structure
+    PARAM_TYPE_UNION    = 0x00100000,   ///< union
+    PARAM_TYPE_ENUM     = 0x00200000,   ///< enumeration
+    PARAM_TYPE_CLASS    = 0x00400000,   ///< class
+    PARAM_TYPE_TYPEDEF  = 0x00800000,   ///< type definition
+    PARAM_TYPE_FUNCPTR  = 0x01000000,   ///< pointer to function
 } pst_param_flags;
 
 typedef struct {

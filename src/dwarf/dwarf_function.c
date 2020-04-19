@@ -314,7 +314,7 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
             del_param(ret_p);
         }
     } else {
-        pst_parameter_add_type(ret_p, "void", 0);
+        pst_parameter_add_type(ret_p, "void", PARAM_TYPE_VOID);
     }
 
     // handle and save additionally these attributes:
@@ -361,8 +361,14 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
                 handle_lexical_block(fn, &result);
                 break;
             }
+            case DW_TAG_unspecified_parameters: {
+                pst_parameter* param = add_param(fn);
+                param->info.flags |= PARAM_TYPE_UNSPEC;
+                param->info.name = pst_strdup("...");
+                break;
+            }
+
             // Also handle:
-            // DW_TAG_unspecified_parameters (unknown number of arguments i.e. fun(arg1, ...);
             // DW_AT_inline
             default:
                 pst_log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
