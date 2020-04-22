@@ -167,7 +167,7 @@ bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
                     break;
                 case DW_TAG_variable: {
                     pst_parameter* param = add_param(fn);
-                    if(!pst_parameter_handle_dwarf(param, &child, fn)) {
+                    if(!parameter_handle_dwarf(param, &child, fn)) {
                         del_param(param);
                     }
                     break;
@@ -202,7 +202,7 @@ bool pst_function_print_dwarf(pst_function* fn)
     pst_parameter* param = pst_function_next_parameter(fn, NULL);
     if(param && (param->info.flags & PARAM_RETURN)) {
         // print return value type, function name and start list of parameters
-        pst_parameter_print_dwarf(param);
+        parameter_print(param);
         fn->ctx->print(fn->ctx, " %s(", fn->info.name);
         param = pst_function_next_parameter(fn, param);
     } else {
@@ -213,7 +213,7 @@ bool pst_function_print_dwarf(pst_function* fn)
     for(; param; param = pst_function_next_parameter(fn, param)) {
         if(param->info.flags & PARAM_RETURN) {
             // print return value type, function name and start list of parameters
-            pst_parameter_print_dwarf(param);
+            parameter_print(param);
             fn->ctx->print(fn->ctx, " %s(", fn->info.name);
             continue;
         }
@@ -229,7 +229,7 @@ bool pst_function_print_dwarf(pst_function* fn)
             } else {
                 fn->ctx->print(fn->ctx, "        ");
             }
-            pst_parameter_print_dwarf(param);
+            parameter_print(param);
             fn->ctx->print(fn->ctx, ";\n");
         } else {
             if(first) {
@@ -237,7 +237,7 @@ bool pst_function_print_dwarf(pst_function* fn)
             } else {
                 fn->ctx->print(fn->ctx, ", ");
             }
-            pst_parameter_print_dwarf(param);
+            parameter_print(param);
         }
     }
 
@@ -307,14 +307,13 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
     // Get reference to return attribute type of the function
     // may be to use dwfl_module_return_value_location() instead
     pst_parameter* ret_p = add_param(fn); ret_p->info.flags |= PARAM_RETURN;
-    attr = dwarf_attr(fn->die, DW_AT_type, &attr_mem);
-    if(attr) {
-        if(!pst_parameter_handle_type(ret_p, attr)) {
+    if(dwarf_hasattr(fn->die, DW_AT_type)) {
+        if(!parameter_handle_type(ret_p, fn->die)) {
             pst_log(SEVERITY_ERROR, "Failed to handle return parameter type for function %s(...)", fn->info.name);
             del_param(ret_p);
         }
     } else {
-        pst_parameter_add_type(ret_p, "void", PARAM_TYPE_VOID);
+        parameter_add_type(ret_p, "void", PARAM_TYPE_VOID);
     }
 
     // handle and save additionally these attributes:
@@ -343,7 +342,7 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
             case DW_TAG_formal_parameter:
             case DW_TAG_variable: {
                 pst_parameter* param = add_param(fn);
-                if(!pst_parameter_handle_dwarf(param, &result, fn)) {
+                if(!parameter_handle_dwarf(param, &result, fn)) {
                     del_param(param);
                 }
 

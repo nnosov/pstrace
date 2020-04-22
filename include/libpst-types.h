@@ -58,7 +58,7 @@ typedef enum {
 
 typedef struct {
     char*           name;           ///< parameter's name
-    char*           type_name;      ///< name of parameter's type in case of 'PARAM_TYPE_TYPEDEF'
+    char*           type_name;      ///< name of parameter's type
     uint32_t        line;           ///< line of parameter definition
     unw_word_t      size;           ///< size of parameter in bits
     unw_word_t      value;          ///< value of parameter. use 'size' to determine number of actual bits of 'value'

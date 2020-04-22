@@ -45,10 +45,10 @@ void pst_parameter_init(pst_parameter* param, pst_context* ctx);
 pst_parameter* pst_parameter_new(pst_context* ctx);
 void pst_parameter_fini(pst_parameter* param);
 
-bool pst_parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun);
-bool pst_parameter_print_dwarf(pst_parameter* param);
-bool pst_parameter_handle_type(pst_parameter* param, Dwarf_Attribute* base);
-pst_type* pst_parameter_add_type(pst_parameter* param, const char* name, pst_param_flags type);
-pst_parameter* pst_parameter_next_child(pst_parameter* param, pst_parameter* p);
+bool parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_function* fun);
+void parameter_print(pst_parameter* param);
+bool parameter_handle_type(pst_parameter* param, Dwarf_Die* result);
+pst_type* parameter_add_type(pst_parameter* param, const char* name, pst_param_flags type);
+pst_parameter* parameter_next_child(pst_parameter* param, pst_parameter* p);
 
 #endif /* __PST_DWARF_PARAMETER_H__ */

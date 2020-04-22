@@ -60,12 +60,17 @@ pst_function_info* pst_get_function_info(pst_function* function)
     return &function->info;
 }
 
-pst_function* pst_get_next_function(pst_handler* handler, pst_function* current)
+pst_function* pst_function_next(pst_handler* handler, pst_function* current)
 {
     return pst_handler_next_function(handler, current);
 }
 
-pst_parameter* pst_get_next_parameter(pst_function* function, pst_parameter* current)
+pst_parameter* pst_parameter_next(pst_function* function, pst_parameter* current)
 {
     return pst_function_next_parameter(function, current);
+}
+
+pst_parameter* pst_parameter_next_child(pst_parameter* parent, pst_parameter* current)
+{
+    return parameter_next_child(parent, current);
 }

@@ -65,7 +65,7 @@ const char* pst_print_simple(pst_handler* handler);
  * @param current pointer to current function. NULL to get first
  * @return pointer to next function's handle, NULL in case of end of list
  */
-const pst_function* pst_get_next_function(pst_handler* handler, pst_function* current);
+const pst_function* pst_function_next(pst_handler* handler, pst_function* current);
 
 /**
  * @brief Get function's information (name, address, line)
@@ -80,7 +80,15 @@ const pst_function_info* pst_get_function_info(pst_function* function);
  * @param current pointer to current parameter. NULL to get first
  * @return pointer to next parameter's handle, NULL in case of end of list
  */
-const pst_parameter* pst_get_next_parameter(pst_function* function, pst_parameter* current);
+const pst_parameter* pst_parameter_next(pst_function* function, pst_parameter* current);
+
+/**
+ * @brief Get next parameter's children parameter (for composite types)
+ * @param parent parent parameter's handler obtained by pst_get_next_parameter()
+ * @param current pointer to current child parameter. NULL to get first
+ * @return pointer to next parameter's handle, NULL in case of end of list
+ */
+const pst_parameter* pst_parameter_next_child(pst_parameter* parent, pst_parameter* current);
 
 /**
  * @brief Get parameter's information (name, type, line etc)
