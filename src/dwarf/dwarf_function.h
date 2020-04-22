@@ -36,9 +36,11 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
 pst_function* pst_function_new(pst_context* _ctx, pst_function* _parent);
 void pst_function_fini(pst_function* fn);
 
-bool pst_function_unwind(pst_function* fn);
-bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d);
-bool pst_function_print_dwarf(pst_function* fn);
-pst_parameter* pst_function_next_parameter(pst_function* fn, pst_parameter* p);
+bool function_unwind(pst_function* fn);
+bool function_handle_dwarf(pst_function * fn, Dwarf_Die* d);
+bool function_print_pretty(pst_function* fn);
+void function_print_simple(pst_function* fn);
+
+pst_parameter* function_next_parameter(pst_function* fn, pst_parameter* p);
 
 #endif /* __PST_DWARF_FUNCTION_H__ */

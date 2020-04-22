@@ -68,7 +68,7 @@ bool get_dwarf_function(pst_handler* h, pst_function* fun)
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
 		    //ctx.log(SEVERITY_DEBUG, "function die name %s", dwarf_diename(&result));
 			if(!strcmp(fun->info.name, dwarf_diename(&result))) {
-				return pst_function_handle_dwarf(fun, &result);
+				return function_handle_dwarf(fun, &result);
 			}
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
@@ -169,7 +169,7 @@ const char* pst_print_pretty(pst_handler* h)
     uint32_t idx = 0;
     for(pst_function* fn = pst_handler_next_function(h, NULL); fn; fn = pst_handler_next_function(h, fn)) {
         h->ctx.print(&h->ctx, "[%-2u] ", idx); idx++;
-        pst_function_print_dwarf(fn);
+        function_print_pretty(fn);
         h->ctx.print(&h->ctx, "\n");
     }
 
@@ -191,14 +191,8 @@ const char* pst_print_simple(pst_handler* h)
     h->ctx.print(&h->ctx, "Simple unwind-based stack trace:\n");
     uint32_t idx = 0;
     for(pst_function* fn = pst_handler_next_function(h, NULL); fn; fn = pst_handler_next_function(h, fn)) {
-        h->ctx.print(&h->ctx, "[%-2d] ", idx);
-        h->ctx.print(fn->ctx, "%s() ", fn->info.name);
-        if(fn->info.file) {
-            h->ctx.print(fn->ctx, "at %s:%d, %p", fn->info.file, fn->info.line, (void*)fn->info.pc);
-        } else {
-            h->ctx.print(fn->ctx, "at %p", (void*)fn->info.pc);
-        }
-        h->ctx.print(&h->ctx, "\n");
+        h->ctx.print(&h->ctx, "[%-2u] ", idx);
+        function_print_simple(fn);
         idx++;
     }
 
@@ -283,7 +277,7 @@ bool pst_handler_unwind(pst_handler* h)
         pst_function* last = last_function(h);
         pst_function* fn = add_function(h, NULL);
         fn->info.pc = pc; fn->info.sp = sp;
-        if(!pst_function_unwind(fn)) {
+        if(!function_unwind(fn)) {
             del_function(fn);
         } else if(last) {
             last->parent = fn;

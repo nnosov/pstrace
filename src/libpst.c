@@ -67,7 +67,7 @@ pst_function* pst_function_next(pst_handler* handler, pst_function* current)
 
 pst_parameter* pst_parameter_next(pst_function* function, pst_parameter* current)
 {
-    return pst_function_next_parameter(function, current);
+    return function_next_parameter(function, current);
 }
 
 pst_parameter* pst_parameter_next_child(pst_parameter* parent, pst_parameter* current)

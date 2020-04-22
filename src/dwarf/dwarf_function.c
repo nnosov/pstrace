@@ -115,19 +115,7 @@ static void clear(pst_function* fn)
     pst_call_site_storage_fini(&fn->call_sites);
 }
 
-pst_parameter* pst_function_next_parameter(pst_function* fn, pst_parameter* p)
-{
-    struct list_node* n = (p == NULL) ? list_first(&fn->params) : list_next(&p->node);
-
-    pst_parameter* ret = NULL;
-    if(n) {
-        ret = list_entry(n, pst_parameter, node);
-    }
-
-    return ret;
-}
-
-bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
+static bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
 {
     uint64_t lowpc = 0, highpc = 0; const char* origin_name = "";
     dwarf_lowpc(result, &lowpc);
@@ -188,7 +176,30 @@ bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
     return true;
 }
 
-bool pst_function_print_dwarf(pst_function* fn)
+pst_parameter* function_next_parameter(pst_function* fn, pst_parameter* p)
+{
+    struct list_node* n = (p == NULL) ? list_first(&fn->params) : list_next(&p->node);
+
+    pst_parameter* ret = NULL;
+    if(n) {
+        ret = list_entry(n, pst_parameter, node);
+    }
+
+    return ret;
+}
+
+void function_print_simple(pst_function* fn)
+{
+    fn->ctx->print(fn->ctx, "%s() ", fn->info.name);
+    if(fn->info.file) {
+        fn->ctx->print(fn->ctx, "at %s:%d, %p", fn->info.file, fn->info.line, (void*)fn->info.pc);
+    } else {
+        fn->ctx->print(fn->ctx, "at %p", (void*)fn->info.pc);
+    }
+    fn->ctx->print(fn->ctx, "\n");
+}
+
+bool function_print_pretty(pst_function* fn)
 {
     char* at = NULL;
     if(fn->info.file) {
@@ -199,18 +210,18 @@ bool pst_function_print_dwarf(pst_function* fn)
     }
 
     // handle return parameter and be safe if function haven't parameters (for example, dwar info for function is absent)
-    pst_parameter* param = pst_function_next_parameter(fn, NULL);
+    pst_parameter* param = function_next_parameter(fn, NULL);
     if(param && (param->info.flags & PARAM_RETURN)) {
         // print return value type, function name and start list of parameters
         parameter_print(param);
         fn->ctx->print(fn->ctx, " %s(", fn->info.name);
-        param = pst_function_next_parameter(fn, param);
+        param = function_next_parameter(fn, param);
     } else {
         fn->ctx->print(fn->ctx, "%s(", fn->info.name);
     }
 
     bool first = true; bool start_variable = false;
-    for(; param; param = pst_function_next_parameter(fn, param)) {
+    for(; param; param = function_next_parameter(fn, param)) {
         if(param->info.flags & PARAM_RETURN) {
             // print return value type, function name and start list of parameters
             parameter_print(param);
@@ -251,7 +262,7 @@ bool pst_function_print_dwarf(pst_function* fn)
     return true;
 }
 
-bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
+bool function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 {
     fn->die = d;
     get_frame(fn);
@@ -378,7 +389,7 @@ bool pst_function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
     return true;
 }
 
-bool pst_function_unwind(pst_function* fn)
+bool function_unwind(pst_function* fn)
 {
     Dwfl_Line *dwline = dwfl_getsrc(fn->ctx->dwfl, fn->info.pc);
     if(dwline != NULL) {
