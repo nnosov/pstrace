@@ -98,6 +98,9 @@ static void parameter_print_type(pst_parameter* param)
                 case PARAM_CONST:
                     param->ctx->print(param->ctx, "%s", "const ");
                     break;
+                case PARAM_VOLATILE:
+                    param->ctx->print(param->ctx, "%s", "volatile ");
+                    break;
                 case PARAM_TYPE_STRUCT:
                     param->ctx->print(param->ctx, "%s", "struct ");
                     break;
@@ -126,6 +129,9 @@ static void parameter_print_type(pst_parameter* param)
                 break;
             case PARAM_TYPE_REF:
                 param->ctx->print(param->ctx, "%s", "&");
+                break;
+            case PARAM_TYPE_RREF:
+                param->ctx->print(param->ctx, "%s", "&&");
                 break;
             case PARAM_TYPE_ARRAY:
                 param->ctx->print(param->ctx, "%s", "[]");
@@ -362,7 +368,12 @@ bool parameter_handle_type(pst_parameter* param, Dwarf_Die* result)
         case DW_TAG_reference_type:
             parameter_add_type(param, NULL, PARAM_TYPE_REF);
             break;
-
+        case DW_TAG_rvalue_reference_type:
+            parameter_add_type(param, NULL, PARAM_TYPE_RREF);
+            break;
+        case DW_TAG_volatile_type:
+            parameter_add_type(param, NULL, PARAM_VOLATILE);
+            break;
         default:
             pst_log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
             break;

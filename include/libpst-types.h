@@ -29,31 +29,33 @@ typedef enum {
     PARAM_CONST         = 0x00000001,   ///< constant access
     PARAM_GLOBAL        = 0x00000002,   ///< global scope
     PARAM_STATIC        = 0x00000004,   ///< parameter defined as static
-    PARAM_RETURN        = 0x00000008,   ///< parameter is return value of a function
-    PARAM_VARIABLE      = 0x00000010,   ///< parameter is variable inside of a function
+    PARAM_VOLATILE      = 0x00000008,
+    PARAM_RETURN        = 0x00000010,   ///< parameter is return value of a function
+    PARAM_VARIABLE      = 0x00000020,   ///< parameter is variable inside of a function
     // validity
-    PARAM_HAS_VALUE     = 0x00000020,   ///< parameter has a valid value (if not set, then value is undefined)
-    PARAM_INVALID       = 0x00000040,   ///< library failed to dereference pointer
+    PARAM_HAS_VALUE     = 0x00000040,   ///< parameter has a valid value (if not set, then value is undefined)
+    PARAM_INVALID       = 0x00000080,   ///< library failed to dereference pointer
     // base types
-    PARAM_TYPE_POINTER  = 0x00000080,   ///< pointer
-    PARAM_TYPE_INT      = 0x00000100,   ///< integer. to determine size of value, use 'size' field of parameter
-    PARAM_TYPE_UINT     = 0x00000200,   ///< unsigned integer. to determine size of value, use 'size' field of parameter
-    PARAM_TYPE_FLOAT    = 0x00000400,   ///< float
-    PARAM_TYPE_BOOL     = 0x00000800,   ///< boolean
-    PARAM_TYPE_VOID     = 0x00001000,   ///< void
-    PARAM_TYPE_CHAR     = 0x00002000,   ///< character
-    PARAM_TYPE_UCHAR    = 0x00004000,   ///< unsigned character
-    PARAM_TYPE_REF      = 0x00008000,   ///< reference
-    PARAM_TYPE_STRING   = 0x00010000,	///< pointer to C zero terminated string
-    PARAM_TYPE_UNSPEC   = 0x00020000,	///< variable number of arguments (... in C/C++)
+    PARAM_TYPE_POINTER  = 0x00000100,   ///< pointer
+    PARAM_TYPE_INT      = 0x00000200,   ///< integer. to determine size of value, use 'size' field of parameter
+    PARAM_TYPE_UINT     = 0x00000400,   ///< unsigned integer. to determine size of value, use 'size' field of parameter
+    PARAM_TYPE_FLOAT    = 0x00000800,   ///< float
+    PARAM_TYPE_BOOL     = 0x00001000,   ///< boolean
+    PARAM_TYPE_VOID     = 0x00002000,   ///< void
+    PARAM_TYPE_CHAR     = 0x00004000,   ///< character
+    PARAM_TYPE_UCHAR    = 0x00008000,   ///< unsigned character
+    PARAM_TYPE_REF      = 0x00010000,   ///< reference
+    PARAM_TYPE_RREF     = 0x00020000,   ///< rvalue reference
+    PARAM_TYPE_STRING   = 0x00040000,	///< pointer to C zero terminated string
+    PARAM_TYPE_UNSPEC   = 0x00080000,	///< variable number of arguments (... in C/C++)
     // complex types
-    PARAM_TYPE_ARRAY    = 0x00040000,   ///< array
-    PARAM_TYPE_STRUCT   = 0x00080000,   ///< structure
-    PARAM_TYPE_UNION    = 0x00100000,   ///< union
-    PARAM_TYPE_ENUM     = 0x00200000,   ///< enumeration
-    PARAM_TYPE_CLASS    = 0x00400000,   ///< class
-    PARAM_TYPE_TYPEDEF  = 0x00800000,   ///< type definition
-    PARAM_TYPE_FUNCPTR  = 0x01000000,   ///< pointer to function
+    PARAM_TYPE_ARRAY    = 0x00100000,   ///< array
+    PARAM_TYPE_STRUCT   = 0x00200000,   ///< structure
+    PARAM_TYPE_UNION    = 0x00400000,   ///< union
+    PARAM_TYPE_ENUM     = 0x00800000,   ///< enumeration
+    PARAM_TYPE_CLASS    = 0x01000000,   ///< class
+    PARAM_TYPE_TYPEDEF  = 0x02000000,   ///< type definition
+    PARAM_TYPE_FUNCPTR  = 0x04000000,   ///< pointer to function
 } pst_param_flags;
 
 typedef struct {
