@@ -114,3 +114,15 @@ unsigned getSLEB128Size(int64_t Value)
 
 	return Size;
 }
+
+#include <sys/mman.h>
+#include <unistd.h>
+bool is_pointer_valid(void *p)
+{
+    /* get the page size */
+    size_t page_size = sysconf(_SC_PAGESIZE);
+    /* find the address of the page that contains p */
+    void *base = (void *)((((size_t)p) / page_size) * page_size);
+    /* call msync, if it returns non-zero, return false */
+    return msync(base, page_size, MS_ASYNC) == 0;
+}
