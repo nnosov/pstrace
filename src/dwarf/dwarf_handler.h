@@ -27,7 +27,7 @@ pst_handler* pst_handler_new(ucontext_t* hctx);
 void pst_handler_fini(pst_handler* h);
 
 bool pst_handler_handle_dwarf(pst_handler* h);
-bool pst_handler_unwind(pst_handler* h);
+bool pst_handler_unwind_simple(pst_handler* h);
 pst_function* pst_handler_next_function(pst_handler* h, pst_function* fn);
 
 #endif /* __PST_DWARF_HANDLER_H__ */

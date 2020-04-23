@@ -22,15 +22,18 @@ pst_handler* pst_lib_init(ucontext_t* hctx, void* buff, uint32_t size)
     } else {
         pst_alloc_init_custom(&allocator, buff, size);
     }
+
     pst_log_init_console(&logger);
 
     pst_new(pst_handler, handler, hctx);
+
     return handler;
 }
 
 // deallocate libpst handler and library
 void pst_lib_fini(pst_handler* h)
 {
+    pst_handler_fini(h);
     pst_free(h);
 
     // global
@@ -41,7 +44,7 @@ void pst_lib_fini(pst_handler* h)
 // save stack trace information to provided buffer in RAM
 int pst_unwind_simple(pst_handler* h)
 {
-    return pst_handler_unwind(h);
+    return pst_handler_unwind_simple(h);
 }
 
 // save stack trace information to provided buffer in RAM

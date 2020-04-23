@@ -472,7 +472,7 @@ void pst_function_fini(pst_function* fn)
     clear(fn);
 
     if(fn->frame) {
-        // use free here because it was allocate out of our control by libdw
+        // use free here because it was allocated out of our control by libdw
         free(fn->frame);
     }
 

@@ -135,7 +135,7 @@ static pst_function* last_function(pst_handler* h)
 bool pst_handler_handle_dwarf(pst_handler* h)
 {
     if(!h->functions.count) {
-        if(!pst_handler_unwind(h)) {
+        if(!pst_handler_unwind_simple(h)) {
             return false;
         }
     }
@@ -200,7 +200,7 @@ const char* pst_print_simple(pst_handler* h)
 }
 
 
-bool pst_handler_unwind(pst_handler* h)
+bool pst_handler_unwind_simple(pst_handler* h)
 {
     void* caller = NULL;     // pointer to the function which requested to unwind stack
 
