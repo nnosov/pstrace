@@ -9,6 +9,7 @@
 #include <dwarf.h>
 #include <elfutils/libdw.h>
 
+#include "common.h"
 #include "dwarf_utils.h"
 #include "context.h"
 #include "dwarf_parameter.h"
@@ -166,6 +167,11 @@ void parameter_print(pst_parameter* param)
 
     if(param->info.flags & PARAM_HAS_VALUE) {
         param->ctx->print(param->ctx, "0x%lX", param->info.value);
+        
+        // don't take care on NULL pointer since obviously it's invalid
+        if((param->info.flags & PARAM_INVALID) && param->info.value != 0) {
+            param->ctx->print(param->ctx, " <invalid>");
+        }
     } else {
         param->ctx->print(param->ctx, "<undefined>");
     }
@@ -286,17 +292,16 @@ bool parameter_handle_type(pst_parameter* param, Dwarf_Die* result)
         return false;
     }
 
-    param->info.size = 64;
+    // get Size attribute and it's value
+    param->info.size = 8;
+    attr = dwarf_attr(&ret_die, DW_AT_byte_size, &attr_mem);
+    if(attr) {
+        dwarf_formudata(attr, &param->info.size);
+    }
+
     switch (dwarf_tag(&ret_die)) {
         // base types
         case DW_TAG_base_type: {
-            // get Size attribute and it's value
-            attr = dwarf_attr(&ret_die, DW_AT_byte_size, &attr_mem);
-            if(attr) {
-                dwarf_formudata(attr, &param->info.size);
-            }
-            pst_log(SEVERITY_DEBUG, "%s: Base type '%s'(%lu)", __FUNCTION__, dwarf_diename(&ret_die), param->info.size);
-
             const char* type_name = dwarf_diename(&ret_die);
             attr = dwarf_attr(&ret_die, DW_AT_encoding, &attr_mem);
             if(attr) {
@@ -379,6 +384,8 @@ bool parameter_handle_type(pst_parameter* param, Dwarf_Die* result)
             break;
     }
 
+    pst_log(SEVERITY_DEBUG, "%s: Parameter type '%s'(%lu) flags = 0x%X", __FUNCTION__, dwarf_diename(&ret_die), param->info.size, param->info.flags);
+
     if(dwarf_hasattr(&ret_die, DW_AT_type)) {
         // handle parameter's sub-type
         return parameter_handle_type(param, &ret_die);
@@ -444,7 +451,15 @@ bool parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_functio
         }
     }
 
-    //param->info.value &=0xFFFFFFFFFFFFFFFF >> (64 - ((param->info.size * 8) & 0x0F));
+    // check pointer validity
+    if((param->info.flags & (PARAM_TYPE_POINTER | PARAM_TYPE_FUNCPTR)) && pst_pointer_valid((void*)param->info.value)) {
+        param->info.flags |= PARAM_INVALID;
+    }
+
+    // clean-up unused bits in parameter's value
+    if(!(param->info.flags & (PARAM_TYPE_POINTER | PARAM_TYPE_FUNCPTR))) {
+        param->info.value &= 0xFFFFFFFFFFFFFFFF >> (64 - ((param->info.size * 8) & 0x3F));
+    }
 
     // hack since DWARF has no ability to determine 'void' it another way
     if(!param->info.type_name) {
