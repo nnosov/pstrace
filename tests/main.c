@@ -69,9 +69,13 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 	    }
 
 	    if(pst_unwind_simple(handler)) {
-	        printf("\n%s", pst_print_simple(handler));
+	        printf("Simple unwind-based stack trace:\n");
+            printf("--------------------------------\n");
+	        printf("%s\n", pst_print_simple(handler));
 	        if(pst_unwind_pretty(handler)) {
-	            printf("\n%s", pst_print_pretty(handler));
+	            printf("DWARF-based stack trace information:\n");
+	            printf("------------------------------------\n");
+	            printf("%s", pst_print_pretty(handler));
 	        } else {
 	            printf("Failed to use DWARF for unwind stack trace\n");
 	        }

@@ -165,7 +165,6 @@ bool pst_handler_handle_dwarf(pst_handler* h)
 const char* pst_print_pretty(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
-    h->ctx.print(&h->ctx, "DWARF-based stack trace information:\n");
     uint32_t idx = 0;
     for(pst_function* fn = pst_handler_next_function(h, NULL); fn; fn = pst_handler_next_function(h, fn)) {
         h->ctx.print(&h->ctx, "[%-2u] ", idx); idx++;
@@ -188,7 +187,6 @@ Dwfl_Callbacks callbacks = {
 const char* pst_print_simple(pst_handler* h)
 {
     h->ctx.clean_print(&h->ctx);
-    h->ctx.print(&h->ctx, "Simple unwind-based stack trace:\n");
     uint32_t idx = 0;
     for(pst_function* fn = pst_handler_next_function(h, NULL); fn; fn = pst_handler_next_function(h, fn)) {
         h->ctx.print(&h->ctx, "[%-2u] ", idx);
