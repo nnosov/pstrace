@@ -7,6 +7,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include "context.h"
 
 int32_t decode_sleb128(uint8_t *sleb128)
 {
@@ -117,12 +118,21 @@ unsigned getSLEB128Size(int64_t Value)
 
 #include <sys/mman.h>
 #include <unistd.h>
-bool is_pointer_valid(void *p)
+#include <errno.h>
+
+int pst_pointer_valid(void *p)
 {
-    /* get the page size */
-    size_t page_size = sysconf(_SC_PAGESIZE);
-    /* find the address of the page that contains p */
-    void *base = (void *)((((size_t)p) / page_size) * page_size);
-    /* call msync, if it returns non-zero, return false */
-    return msync(base, page_size, MS_ASYNC) == 0;
+    long page_size = sysconf(_SC_PAGESIZE);
+    if(page_size < 0) {
+        pst_log(SEVERITY_ERROR, "%s: Failed to determine page size");
+        return EFAULT;
+    }
+
+    void *aligned = (void *)((((long)p) / page_size) * page_size);
+    //void *aligned = (void *)((uintptr_t)p & ~(page_size - 1));
+    if(msync(aligned, page_size, MS_ASYNC) == 0) {
+        return 0;
+    }
+
+    return (errno == ENOMEM ? EINVAL : EFAULT);
 }
