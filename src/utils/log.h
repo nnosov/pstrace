@@ -40,10 +40,10 @@ typedef struct __pst_log {
     pthread_mutex_t             mLock;
 
     void*                       child;
-} pst_log;
+} pst_logger;
 
-void pst_log_init_console(pst_log* log);
-void pst_log_init_file(pst_log* log, const char* path, uint64_t max_bytes);
-void pst_log_fini(pst_log* log);
+void pst_log_init_console(pst_logger* log);
+void pst_log_init_file(pst_logger* log, const char* path, uint64_t max_bytes);
+void pst_log_fini(pst_logger* log);
 
 #endif /* __PST_LOG_H_ */

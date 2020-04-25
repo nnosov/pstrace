@@ -12,9 +12,8 @@ typedef enum {
 	DEF_3
 } my_int;
 
-void Fun2(int arg1, uint32_t arg2)
+void Fun2(int arg1, uint32_t arg2, int* ptr)
 {
-	int* ptr = NULL;
 	*ptr = arg1;
 	void* ptr2 = ptr+1;
 	printf("%p\n", ptr2);
@@ -24,7 +23,7 @@ uint32_t Fun1(const int arg1, my_int arg2, uint32_t arg3)
 {
 	int my_local = arg1 + 2;
 	printf("%d\n", my_local);
-	Fun2(my_local, arg3);
+	Fun2(my_local, arg3, (int*)0x12345);
 	return arg2;
 }
 
@@ -70,9 +69,9 @@ void FatalSignalHandler(int sig, siginfo_t* info, void* context)
 	    }
 
 	    if(pst_unwind_simple(handler)) {
-	        printf("%s", pst_print_simple(handler));
+	        printf("\n%s", pst_print_simple(handler));
 	        if(pst_unwind_pretty(handler)) {
-	            printf("%s", pst_print_pretty(handler));
+	            printf("\n%s", pst_print_pretty(handler));
 	        } else {
 	            printf("Failed to use DWARF for unwind stack trace\n");
 	        }

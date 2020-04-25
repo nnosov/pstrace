@@ -12,12 +12,12 @@ const char * const severity_map[] = {
         " [ERROR]  : "
 };
 
-static void format_string(pst_log* log, const char* fmt, va_list args)
+static void format_string(pst_logger* log, const char* fmt, va_list args)
 {
     log->mStringLen += vsnprintf(log->mString + log->mStringLen, log->mStringSize - log->mStringLen, fmt, args);
 }
 
-static void format_prefix(pst_log* log, SC_LogSeverity severity)
+static void format_prefix(pst_logger* log, SC_LogSeverity severity)
 {
     time_t rawTime;
     struct tm * timeinfo;
@@ -29,7 +29,7 @@ static void format_prefix(pst_log* log, SC_LogSeverity severity)
     log->mStringLen += strlen(severity_map[(int)severity]);
 }
 
-static void format_postfix(pst_log* log)
+static void format_postfix(pst_logger* log)
 {
     if((log->mStringLen + 2) < log->mStringSize) {
         log->mString[log->mStringLen++] = '\n';
@@ -38,7 +38,7 @@ static void format_postfix(pst_log* log)
 }
 
 //variable argument number logging
-static void log_base(pst_log* log, SC_LogSeverity severity, const char* fmt, ...)
+static void log_base(pst_logger* log, SC_LogSeverity severity, const char* fmt, ...)
 {
     if (severity < log->mCurrentSeverity)
         return;
@@ -61,7 +61,7 @@ static void log_base(pst_log* log, SC_LogSeverity severity, const char* fmt, ...
     pthread_mutex_unlock(&log->mLock);
 }
 
-static void log_init_base(pst_log* plog, const char* source)
+static void log_init_base(pst_logger* plog, const char* source)
 {
     // methods
     plog->log = log_base;
@@ -79,7 +79,7 @@ static void log_init_base(pst_log* plog, const char* source)
     plog->child = 0;
 }
 
-void pst_log_fini(pst_log* log)
+void pst_log_fini(pst_logger* log)
 {
     pthread_mutex_destroy(&log->mLock);
     log->close(log);
@@ -99,7 +99,7 @@ void pst_log_fini(pst_log* log)
 #define NC      "\e[0m" // No Color
 
 //actually sends message to the source
-static void send_msg_console(pst_log* log, SC_LogSeverity severity)
+static void send_msg_console(pst_logger* log, SC_LogSeverity severity)
 {
     const char* color = NC;
     switch(severity) {
@@ -123,19 +123,19 @@ static void send_msg_console(pst_log* log, SC_LogSeverity severity)
     fprintf(stderr, "%s%s%s", color, log->mString, NC);
 }
 
-static void close_console(pst_log* log) {
+static void close_console(pst_logger* log) {
     // do nothing
 }
 
-static bool open_console(pst_log* log) {
+static bool open_console(pst_logger* log) {
     return true;
 }
 
-static bool is_opened_console(pst_log* log) {
+static bool is_opened_console(pst_logger* log) {
     return true;
 }
 
-void pst_log_init_console(pst_log* log)
+void pst_log_init_console(pst_logger* log)
 {
     log_init_base(log, NULL);
     log->close = close_console;
@@ -157,7 +157,7 @@ typedef struct _file_spec {
 } file_spec;
 
 //open file for writing
-static bool open_file(pst_log* log)
+static bool open_file(pst_logger* log)
 {
     file_spec* fsp = (file_spec*)log->child;
     if(!fsp) {
@@ -187,7 +187,7 @@ static bool open_file(pst_log* log)
     return (fsp->fd != 0);
 }
 
-static void close_file(pst_log* log)
+static void close_file(pst_logger* log)
 {
     file_spec* fsp = (file_spec*)log->child;
     if(!fsp) {
@@ -203,7 +203,7 @@ static void close_file(pst_log* log)
     fsp->max_bytes = 0;
 }
 
-static bool is_file_opened(pst_log* log)
+static bool is_file_opened(pst_logger* log)
 {
     file_spec* fsp = (file_spec*)log->child;
     if(!fsp) {
@@ -213,7 +213,7 @@ static bool is_file_opened(pst_log* log)
     return (fsp->fd != 0);
 }
 
-static void send_msg_file(pst_log* log, SC_LogSeverity severity)
+static void send_msg_file(pst_logger* log, SC_LogSeverity severity)
 {
     file_spec* fsp = (file_spec*)log->child;
     if(!fsp) {
@@ -231,7 +231,7 @@ static void send_msg_file(pst_log* log, SC_LogSeverity severity)
     }
 }
 
-void pst_log_init_file(pst_log* log, const char* path, uint64_t max_bytes)
+void pst_log_init_file(pst_logger* log, const char* path, uint64_t max_bytes)
 {
     log_init_base(log, path);
     file_spec* fsp = (file_spec*)malloc(sizeof(file_spec));

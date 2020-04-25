@@ -117,14 +117,9 @@ static void clear(pst_function* fn)
 
 static bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
 {
-    uint64_t lowpc = 0, highpc = 0; const char* origin_name = "";
-    dwarf_lowpc(result, &lowpc);
-    dwarf_highpc(result, &lowpc);
-
     Dwarf_Attribute attr_mem;
     Dwarf_Die origin;
     if(dwarf_hasattr (result, DW_AT_abstract_origin) && dwarf_formref_die (dwarf_attr (result, DW_AT_abstract_origin, &attr_mem), &origin) != NULL) {
-        origin_name = dwarf_diename(&origin);
         Dwarf_Die child;
         if(dwarf_child (&origin, &child) == 0) {
             do {
@@ -141,11 +136,7 @@ static bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
             } while (dwarf_siblingof (&child, &child) == 0);
         }
     }
-    const char* die_name = "";
-    if(dwarf_diename(result)) {
-        die_name = dwarf_diename(result);
-    }
-    pst_log(SEVERITY_DEBUG, "Lexical block with name '%s', tag 0x%X and origin '%s' found. lowpc = 0x%lX, highpc = 0x%lX", die_name, dwarf_tag (result), origin_name, lowpc, highpc);
+
     Dwarf_Die child;
     if(dwarf_child (result, &child) == 0) {
         do {

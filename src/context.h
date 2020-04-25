@@ -18,13 +18,20 @@
 #include "utils/allocator.h"
 #include "utils/log.h"
 
-extern pst_log          logger;     // logger for whole PST library
+// uncomment line below to enable debug output to stdout
+//#define PST_DEBUG
+
+extern pst_logger       logger;     // logger for whole PST library
 extern pst_allocator    allocator;  // custom allocator for PST library
 
 #define pst_alloc(TYPE) (TYPE*)allocator.alloc(&allocator, sizeof(TYPE))
 #define pst_free(NAME) allocator.free(&allocator, NAME)
 
+#ifdef PST_DEBUG
 #define pst_log(SEVERITY, FORMAT, ...) logger.log(&logger, SEVERITY, FORMAT, ##__VA_ARGS__)
+#else
+#define pst_log(SEVERITY, FORMAT, ...)
+#endif
 
 char* pst_strdup(const char* str);
 
