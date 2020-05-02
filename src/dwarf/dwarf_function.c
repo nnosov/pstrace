@@ -271,7 +271,7 @@ bool function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
 //  }
 
     unw_proc_info_t info;
-    unw_get_proc_info(&fn->info.context, &info);
+    unw_get_proc_info(&fn->context, &info);
     fn->ctx->clean_print(fn->ctx);
 
     pst_log(SEVERITY_INFO, "Function %s(...): LOW_PC = %#lX, HIGH_PC = %#lX, offset from base address: 0x%lX, START_PC = 0x%lX, offset from start of function: 0x%lX",
@@ -429,7 +429,7 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
     fn->info.pc = 0;
     fn->info.lowpc = 0;
     fn->info.highpc = 0;
-    bzero(&fn->info.context, sizeof(fn->info.context));
+    bzero(&fn->context, sizeof(fn->context));
     fn->info.name = NULL;
     fn->info.line = -1;
     fn->info.file = NULL;
@@ -440,7 +440,7 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
     list_head_init(&fn->params);
     pst_call_site_storage_init(&fn->call_sites, _ctx);
 
-    memcpy(&fn->info.context, &_ctx->cursor, sizeof(fn->info.context));
+    memcpy(&fn->context, &_ctx->cursor, sizeof(fn->context));
     fn->parent = _parent;
     fn->frame = NULL;
     fn->ctx = _ctx;

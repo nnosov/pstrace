@@ -61,19 +61,16 @@ bool get_dwarf_function(pst_handler* h, pst_function* fun)
 		return false;
 	}
 
-	bool nret = false;
-
 	do {
 		int tag = dwarf_tag(&result);
 		if(tag == DW_TAG_subprogram || tag == DW_TAG_entry_point || tag == DW_TAG_inlined_subroutine) {
-		    //ctx.log(SEVERITY_DEBUG, "function die name %s", dwarf_diename(&result));
 			if(!strcmp(fun->info.name, dwarf_diename(&result))) {
 				return function_handle_dwarf(fun, &result);
 			}
 		}
 	} while(dwarf_siblingof(&result, &result) == 0);
 
-	return nret;
+	return false;
 }
 
 static pst_function* add_function(pst_handler* h, pst_function* parent)
@@ -152,7 +149,7 @@ bool pst_handler_handle_dwarf(pst_handler* h)
         // setup context
         h->ctx.module       = dwfl_addrmodule(h->ctx.dwfl, fun->info.pc);
         h->ctx.base_addr    = (uint64_t)info.dli_fbase;
-        h->ctx.curr_frame   = &fun->info.context;
+        h->ctx.curr_frame   = &fun->context;
         h->ctx.sp           = fun->info.sp;
         h->ctx.cfa          = fun->info.cfa;
 

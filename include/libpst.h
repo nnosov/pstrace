@@ -75,6 +75,15 @@ const pst_function* pst_function_next(pst_handler* handler, pst_function* curren
 const pst_function_info* pst_get_function_info(pst_function* function);
 
 /**
+ * @brief Get value of CPU register in function's frame
+ * @param function function's handler obtained by pst_get_next_function()
+ * @param regno index of register
+ * @param val pointer to store register's value
+ * @return zero on success, UNW_EUNSPEC in case of unspecified error, UNW_EBADREG - register that is either invalid or not accessible in the current frame
+ */
+int pst_get_register(pst_function* function, int regno, unw_word_t* val);
+
+/**
  * @brief Get next parameter's handle in function
  * @param function Function's handler obtained by pst_get_next_function()
  * @param current pointer to current parameter. NULL to get first

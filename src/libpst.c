@@ -68,6 +68,11 @@ pst_function* pst_function_next(pst_handler* handler, pst_function* current)
     return pst_handler_next_function(handler, current);
 }
 
+int pst_get_register(pst_function* fn, int regno, unw_word_t* val)
+{
+    return unw_get_reg(&fn->context, regno, val);
+}
+
 pst_parameter* pst_parameter_next(pst_function* function, pst_parameter* current)
 {
     return function_next_parameter(function, current);

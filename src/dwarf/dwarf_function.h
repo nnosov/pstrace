@@ -30,6 +30,7 @@ typedef struct pst_function {
     pst_function*           parent;     // parent function in call trace (caller)
     Dwarf_Frame*            frame;      // function's stack frame
     pst_context*            ctx;        // context of unwinding
+    unw_cursor_t            context;    ///< Function's frame including register's values
     bool                    allocated;  // whether this object was allocated or not
 } pst_function;
 void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _parent);

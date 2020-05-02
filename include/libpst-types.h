@@ -11,6 +11,18 @@
 #include <stdint.h>
 #include <libunwind.h>
 
+/// @brief bitmask of function's options
+typedef enum {
+    FUNC_GLOBAL     = 0x00000001,   ///< function has global visibility
+    FUNC_LOCAL      = 0x00000002,   ///< function has local visibility
+    IS_MEMBER_OF    = 0x00000004,   ///< function is member of class
+    IS_INLINED      = 0x00000008,   ///< function was inlined
+    IS_PRIVATE      = 0x00000010,   ///< private member of class
+    IS_PROTECTED    = 0x00000020,   ///< protected member of class
+    IS_PUBLIC       = 0x00000040,   ///< public member of class
+} pst_fun_flags;
+
+
 typedef struct {
     char*           name;   ///< demangled name of the function. NULL if function name resolution failed
     char*           file;   ///< file name where the function is defined. NULL if library failed to get file name
@@ -20,7 +32,7 @@ typedef struct {
     unw_word_t      highpc; ///< offset to the next address after the end of the function against base address
     unw_word_t      sp;     ///< SP register in function's frame
     unw_word_t      cfa;    ///< CFA (Canonical Frame Address) of the function. !!! Don't use CFA provided by libunwind, it's not valid !!!
-    unw_cursor_t    context;///< Function's frame including register's values
+    pst_fun_flags   flags;  ///< flags of various function options
 } pst_function_info;
 
 /// @brief bitmask of parameter's options
