@@ -70,6 +70,12 @@ pst_function* pst_function_next(pst_handler* handler, pst_function* current)
 
 int pst_get_register(pst_function* fn, int regno, unw_word_t* val)
 {
+    if(regno == UNW_X86_64_CFA) {
+        // intentionally return our own CFA obtained using libdw since libunwind returns wrong register value
+        *val = fn->info.cfa;
+        return 0;
+    }
+
     return unw_get_reg(&fn->context, regno, val);
 }
 
