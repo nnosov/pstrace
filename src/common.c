@@ -7,6 +7,10 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <errno.h>
+
 #include "context.h"
 
 int32_t decode_sleb128(uint8_t *sleb128)
@@ -116,11 +120,7 @@ unsigned getSLEB128Size(int64_t Value)
 	return Size;
 }
 
-#include <sys/mman.h>
-#include <unistd.h>
-#include <errno.h>
-
-int pst_pointer_valid(void *p)
+int pst_pointer_valid(void *p, uint32_t size)
 {
     long page_size = sysconf(_SC_PAGESIZE);
     if(page_size < 0) {
@@ -130,7 +130,7 @@ int pst_pointer_valid(void *p)
 
     void *aligned = (void *)((((long)p) / page_size) * page_size);
     //void *aligned = (void *)((uintptr_t)p & ~(page_size - 1));
-    if(msync(aligned, page_size, MS_ASYNC) == 0) {
+    if(msync(aligned, size, MS_ASYNC) == 0) {
         return 0;
     }
 

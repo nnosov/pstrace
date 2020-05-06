@@ -429,13 +429,14 @@ void pst_function_init(pst_function* fn, pst_context* _ctx, pst_function* _paren
     fn->info.pc = 0;
     fn->info.lowpc = 0;
     fn->info.highpc = 0;
-    bzero(&fn->context, sizeof(fn->context));
     fn->info.name = NULL;
     fn->info.line = -1;
     fn->info.file = NULL;
     fn->info.sp = 0;
+    fn->info.flags = 0;
 
     // internal fields
+    bzero(&fn->context, sizeof(fn->context));
     fn->die = NULL;
     list_head_init(&fn->params);
     pst_call_site_storage_init(&fn->call_sites, _ctx);

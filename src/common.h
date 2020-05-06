@@ -21,6 +21,6 @@
 
 int32_t decode_sleb128(uint8_t *sleb128);
 uint32_t decode_uleb128(uint8_t *uleb128);
-int pst_pointer_valid(void *p);
+int pst_pointer_valid(void *p, uint32_t size);
 
 #endif // __PST_COMMON_H__

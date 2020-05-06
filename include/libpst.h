@@ -27,8 +27,8 @@ typedef struct pst_parameter pst_parameter;
 /**
  * @brief allocate libpst handler and initialize the library
  * @param context context of process given to signal handler of a program. If NULL, then we are not in signal handler
- * @param buff pointer to buffer by libpst custom allocator(i.e. no malloc() will beused). if NULL, then standard allocator will be used
- * @param size of 'buff'
+ * @param buff pointer to buffer for libpst custom allocator(i.e. no malloc()/free() will be used). if NULL, then standard allocator will be used
+ * @param size of 'buff'. recommended size is not less than 4Kb
  *
  * @return pointer to handler to be used for all other operations. NULL in case of error
  */
@@ -82,6 +82,13 @@ const pst_function_info* pst_get_function_info(pst_function* function);
  * @return zero on success, UNW_EUNSPEC in case of unspecified error, UNW_EBADREG - register that is either invalid or not accessible in the current frame
  */
 int pst_get_register(pst_function* function, int regno, unw_word_t* val);
+
+/**
+ * @brief Check memory range of process to validity (i.e. that process has access to this range)
+ * @param p pointer to start of range
+ * @param size size of range to check
+ */
+int pst_pointer_valid(void *p, uint32_t size);
 
 /**
  * @brief Get next parameter's handle in function

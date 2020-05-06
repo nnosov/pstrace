@@ -58,7 +58,7 @@ typedef union {
     void*       ptr;
 } pst_sized_value;
 
-typedef struct __pst_dwarf_value {
+typedef struct {
     list_node            node;       // uplink
 
     // fields

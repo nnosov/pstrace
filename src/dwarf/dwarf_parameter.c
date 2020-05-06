@@ -332,6 +332,8 @@ bool parameter_handle_type(pst_parameter* param, Dwarf_Die* result)
                     case DW_ATE_decimal_float:
                         parameter_add_type(param, type_name, PARAM_TYPE_FLOAT);
                         break;
+                    default:
+                        pst_log(SEVERITY_WARNING, "Unknown parameter base type encodings 0x%lX", enc_type);
                 }
 
             }
@@ -378,6 +380,9 @@ bool parameter_handle_type(pst_parameter* param, Dwarf_Die* result)
             break;
         case DW_TAG_volatile_type:
             parameter_add_type(param, NULL, PARAM_VOLATILE);
+            break;
+        case DW_TAG_string_type:
+            pst_log(SEVERITY_DEBUG, "String type, skipping");
             break;
         default:
             pst_log(SEVERITY_WARNING, "Unknown 0x%X tag type", dwarf_tag(&ret_die));
@@ -445,14 +450,10 @@ bool parameter_handle_dwarf(pst_parameter* param, Dwarf_Die* result, pst_functio
                 pst_log(SEVERITY_WARNING, "Unknown form '0x%X' of attribute for Constant value", dwarf_whatform(attr));
                 param->info.flags &= ~PARAM_HAS_VALUE;
         }
-
-        if(param->info.flags & PARAM_HAS_VALUE) {
-            pst_log(SEVERITY_DEBUG, "Parameter constant value: 0x%lX", param->info.value);
-        }
     }
 
     // check pointer validity
-    if((param->info.flags & (PARAM_TYPE_POINTER | PARAM_TYPE_FUNCPTR)) && pst_pointer_valid((void*)param->info.value)) {
+    if((param->info.flags & (PARAM_TYPE_POINTER | PARAM_TYPE_FUNCPTR)) && pst_pointer_valid((void*)param->info.value, sizeof((void*)param->info.size))) {
         param->info.flags |= PARAM_INVALID;
     }
 

@@ -31,7 +31,7 @@ typedef struct {
     unw_word_t      lowpc;  ///< offset to start of the function against base address
     unw_word_t      highpc; ///< offset to the next address after the end of the function against base address
     unw_word_t      sp;     ///< SP register in function's frame
-    unw_word_t      cfa;    ///< CFA (Canonical Frame Address) of the function. !!! Don't use CFA provided by libunwind, it's not valid !!!
+    unw_word_t      cfa;    ///< CFA (Canonical Frame Address) of the function
     pst_fun_flags   flags;  ///< flags of various function options
 } pst_function_info;
 

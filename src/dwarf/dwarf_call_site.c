@@ -147,7 +147,7 @@ void pst_call_site_init(pst_call_site* site, pst_context* c, uint64_t tgt, const
 
     site->target = tgt;
     if(orn) {
-        site->origin = strdup(orn);
+        site->origin = pst_strdup(orn);
     } else {
         site->origin = NULL;
     }
