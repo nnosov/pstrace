@@ -7,7 +7,7 @@
 * [Unwinding-related gcc options](#unwinding-related-gcc-options)
 * [Useful links](#useful-links)
 
-The goal of the project is to enable C/C++ (and in future other languages) developers to get informative  stack trace in case of program crash, for example inside of segmentation fault handler. The key feature is to log not only function address/name/line but additionally (if DWARF `.debug_info` section is present) values of function's parameters and variables.
+The goal of the project is to enable C/C++ (and in future other languages) developers to get informative  stack trace in case of program crash, for example inside of segmentation fault handler. The key feature is to log not only function address/name/line but additionally (if DWARF `.debug_info` section is present) values of function's parameters and variables and their **values**.
 
 Currently development is focused on `x86_64` architecture and for Linux OS, but further may be expanded to other architectures and OS if it will be demanded and some people will like to contribute to the project to support this architecture and OS.
 
