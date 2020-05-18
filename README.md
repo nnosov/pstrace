@@ -7,15 +7,18 @@
 * [Unwinding-related gcc options](#unwinding-related-gcc-options)
 * [Useful links](#useful-links)
 
-The goal of the project is to enable C/C++ (and in future other languages) developers to get informative  stack trace in case of program crash, for example inside of segmentation fault handler. The key feature is to log not only function address/name/line but additionally (if DWARF `.debug_info` section is present) values of function's parameters and variables and their **values**.
+- The 1st goal of the project is to enable C/C++ (and in future other languages) developers to get informative  stack trace in case of program crash, for example inside of segmentation fault handler. The key feature is to log not only function address/name/line but additionally (if DWARF `.debug_info` section is present) function's parameters and variables and their **values**.
+
+- The 2nd goal is to enable C/C++ (and in future other languages) developers to provide an API to make their own debug facilities on base of PSTrace library.
+- The 3rd goal is to enable C/C++ (and in future other languages) developers to provide an API to profile their programs internally instead of external tools.
 
 Currently development is focused on `x86_64` architecture and for Linux OS, but further may be expanded to other architectures and OS if it will be demanded and some people will like to contribute to the project to support this architecture and OS.
 
-As a first stage the goal is to dump only C/C++ base types such as pointer, boolean, integer etc**(done)**.
+As a first sub-stage of 1st goal is to handle only C/C++ base types such as pointer, boolean, integer etc **(done)**.
 
-Second stage is to dump composite types such as a C structures, arrays, C++ classes, etc.
+As a second sub-stage of 1st goal is to handle dereferenced pointers to data types with pointer validation **(done)**.
 
-Third stage is to dump dereferenced pointers to data types with pointer validation.
+As a second sub-stage of 1st goal is to handle composite types such as a C structures, arrays, C++ classes, etc **(in progress)**.
 
 ## Dependencies
 
