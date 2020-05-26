@@ -158,7 +158,7 @@ static bool handle_lexical_block(pst_function* fn, Dwarf_Die* result)
                     pst_log(SEVERITY_DEBUG, "Skipping Lexical block tag 'DW_TAG_inlined_subroutine'");
                     break;
                 default:
-                    pst_log(SEVERITY_DEBUG, "Unknown Lexical block tag 0x%X", dwarf_tag(&child));
+                    pst_log(SEVERITY_WARNING, "Unknown Lexical block tag 0x%X", dwarf_tag(&child));
                     break;
             }
         }while (dwarf_siblingof (&child, &child) == 0);
@@ -372,7 +372,7 @@ bool function_handle_dwarf(pst_function * fn, Dwarf_Die* d)
             // Also handle:
             // DW_AT_inline
             default:
-                pst_log(SEVERITY_DEBUG, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
+                pst_log(SEVERITY_WARNING, "Unknown TAG of function: 0x%X", dwarf_tag(&result));
                 break;
         }
     } while(dwarf_siblingof(&result, &result) == 0);
@@ -464,7 +464,7 @@ void pst_function_fini(pst_function* fn)
     clear(fn);
 
     if(fn->frame) {
-        // use free here because it was allocated out of our control by libdw
+        // use free() here because it was allocated out of our control by libdw
         free(fn->frame);
     }
 

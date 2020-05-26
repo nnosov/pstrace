@@ -22,7 +22,7 @@ typedef enum {
     IS_PUBLIC       = 0x00000040,   ///< public member of class
 } pst_fun_flags;
 
-
+/// @brief information about function
 typedef struct {
     char*           name;   ///< demangled name of the function. NULL if function name resolution failed
     char*           file;   ///< file name where the function is defined. NULL if library failed to get file name
@@ -70,6 +70,7 @@ typedef enum {
     PARAM_TYPE_FUNCPTR  = 0x04000000,   ///< pointer to function
 } pst_param_flags;
 
+/// @brief information about parameter
 typedef struct {
     char*           name;           ///< parameter's name
     char*           type_name;      ///< name of parameter's type

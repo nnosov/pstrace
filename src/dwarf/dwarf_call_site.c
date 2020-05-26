@@ -125,7 +125,7 @@ bool call_site_handle_dwarf(pst_call_site* site, Dwarf_Die* child)
                         pst_dwarf_expr_fini(&loc);
                         pst_log(SEVERITY_DEBUG, "  DW_AT_GNU_call_site_value:\"%s\" ==> 0x%lX", site->ctx->buff, param->value);
                     } else {
-                        pst_log(SEVERITY_ERROR, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
+                        pst_log(SEVERITY_WARNING, "Failed to calculate DW_AT_location expression: %s", site->ctx->buff);
                         del_param(param);
                         pst_dwarf_expr_fini(&loc);
                         return false;

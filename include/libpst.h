@@ -84,9 +84,10 @@ const pst_function_info* pst_get_function_info(pst_function* function);
 int pst_get_register(pst_function* function, int regno, unw_word_t* val);
 
 /**
- * @brief Check memory range of process to validity (i.e. that process has access to this range)
+ * @brief Check memory range of process for validity (i.e. that process has access to this range)
  * @param p pointer to start of range
  * @param size size of range to check
+ * @return zero if range of memory pointed by 'p' is valid
  */
 int pst_pointer_valid(void *p, uint32_t size);
 

@@ -16,6 +16,7 @@
 // not implemented operations
 static bool dw_op_notimpl(pst_dwarf_stack* stack, const dwarf_op_map* map, Dwarf_Word op1, Dwarf_Word op2)
 {
+    pst_log(SEVERITY_WARNING, "Not implemented DWARF operation %s(0x%X)", map->op_name, map->op_num);
 	return false;
 }
 
