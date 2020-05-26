@@ -18,7 +18,7 @@ As a first sub-stage of 1st goal is to handle only C/C++ base types such as poin
 
 As a second sub-stage of 1st goal is to handle dereferenced pointers to data types with pointer validation **(done)**.
 
-As a second sub-stage of 1st goal is to handle composite types such as a C structures, arrays, C++ classes, etc **(in progress)**.
+As a third sub-stage of 1st goal is to handle composite types such as a C structures, arrays, C++ classes, etc **(in progress)**.
 
 ## Dependencies
 
@@ -38,7 +38,7 @@ To build, install these packages:
 
 As an example how to use library, see tests/main.c
 
-## commands to work with debug information
+## Commands to work with debug information
 
 produce very simple debug info without sources
 `echo 'void foo () {}' | gcc -g -O99 -o - -S -xc - -dA | grep frame_base`
@@ -75,8 +75,11 @@ disassemble executable
 
 ## unwinding-related gcc options
 *-funwind-tables* tells linker to generate .eh_frame section containing CFI. enabled by default if gcc/g++ used for linking
+
 *-fexceptions* Enable exception handling. Generates extra code needed to propagate exceptions.
+
 *-rdynamic* exports the symbols of an executable, allows to print function names in backtrace
+
 *-fno-omit-frame-pointer* instructs the compiler to store the stack frame pointer in a register RBP for x86_64.
 
 ## Useful links
