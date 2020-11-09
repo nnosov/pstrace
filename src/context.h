@@ -57,7 +57,6 @@ typedef struct __pst_context {
     Dwfl*                       dwfl;       // DWARF context
     Dwfl_Module*                module;     // currently processed CU
 
-    // print buffer
     char                        buff[8192]; // stack trace buffer
     uint32_t                    offset;     // offset in the 'buff'
 } pst_context;

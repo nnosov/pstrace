@@ -11,8 +11,8 @@
 #include <inttypes.h>
 #include <elfutils/libdwfl.h>
 
-#include "../utils/allocator.h"
-#include "../utils/list_head.h"
+#include "utils/allocator.h"
+#include "utils/list_head.h"
 
 // DWARF operation (represents our own DW_OP_XXX)
 typedef struct {

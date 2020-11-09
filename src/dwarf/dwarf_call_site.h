@@ -11,9 +11,9 @@
 #include <inttypes.h>
 #include <elfutils/libdw.h>
 
-#include "../src/dwarf/dwarf_expression.h"
-#include "../utils/hash_multimap.h"
-#include "../utils/list_head.h"
+#include "dwarf_expression.h"
+#include "utils/hash_multimap.h"
+#include "utils/list_head.h"
 #include "context.h"
 
 typedef struct __pst_callee_info {

@@ -11,8 +11,8 @@
 
 #include <elfutils/libdwfl.h>
 
-#include "../src/dwarf/dwarf_stack.h"
-#include "../utils/list_head.h"
+#include "dwarf/dwarf_stack.h"
+#include "utils/list_head.h"
 #include "common.h"
 #include "context.h"
 #include "dwarf_handler.h"
