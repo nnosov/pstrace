@@ -17,7 +17,7 @@
 extern dwarf_reg_map    reg_map[];
 extern int regnum;
 
-pst_logger      logger;     // logger for library
+pst_logger      pstlogger;  // logger for library
 pst_allocator   allocator;  // custom allocator for PST library
 
 static void clean_print(pst_context* ctx)

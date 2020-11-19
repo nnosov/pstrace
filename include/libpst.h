@@ -14,6 +14,10 @@
 #include <ucontext.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "libpst-types.h"
 
 typedef struct pst_handler pst_handler;
@@ -132,5 +136,9 @@ int pst_unwind_pretty(pst_handler* handler);
  * @return pointer to zero terminated C string, NULL on failure
  */
 const char* pst_print_pretty(pst_handler* handler);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __LIBPST_EXTERNAL_H_ */

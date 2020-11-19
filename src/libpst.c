@@ -23,7 +23,7 @@ pst_handler* pst_lib_init(ucontext_t* hctx, void* buff, uint32_t size)
         pst_alloc_init_custom(&allocator, buff, size);
     }
 
-    pst_log_init_console(&logger);
+    pst_log_init_console(&pstlogger);
 
     pst_new(pst_handler, handler, hctx);
 
@@ -37,7 +37,7 @@ void pst_lib_fini(pst_handler* h)
     pst_free(h);
 
     // global
-    pst_log_fini(&logger);
+    pst_log_fini(&pstlogger);
     pst_alloc_fini(&allocator);
 }
 
