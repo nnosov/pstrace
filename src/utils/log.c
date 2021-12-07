@@ -25,8 +25,7 @@ static void format_prefix(pst_logger* log, SC_LogSeverity severity)
     timeinfo = gmtime(&rawTime);
 
     log->mStringLen += strftime(log->mString, sizeof(log->mString), "%d-%m-%Y %H:%M:%S", timeinfo);
-    strncpy(log->mString + log->mStringLen, severity_map[(int)severity], strlen(severity_map[(int)severity]));
-    log->mStringLen += strlen(severity_map[(int)severity]);
+    log->mStringLen += snprintf(log->mString + log->mStringLen, sizeof(log->mString) - log->mStringLen, "%s", severity_map[(int)severity]);
 }
 
 static void format_postfix(pst_logger* log)
